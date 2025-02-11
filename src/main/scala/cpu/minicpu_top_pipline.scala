@@ -5,34 +5,47 @@ class pre_IF extends Module {
     val offs_ext = Input(SInt(32.W))
     val gr_rj = Input(SInt(32.W))
     val pc = Input(UInt(32.W))
-    val base_pc_add_offs = Input(Bool())
     val base_pc_from_rj = Input(Bool())
     val nextpc = Output(UInt(32.W))
   })
-  val valid = Reg(Bool())
-  val rst = reset.asBool
-  valid := rst
+  // val valid = Reg(Bool())
+  // val rst = reset.asBool
+  // valid := rst
 
-  val pc_add_src1 = Mux(io.base_pc_add_offs, io.offs_ext, 4.S(32.W))
+  // val pc_add_src1 = io.offs_ext
+  // val pc_add_src2 = Mux(io.base_pc_from_rj, io.gr_rj, io.pc.asSInt)
+  // val nextpc = (pc_add_src1 + pc_add_src2).asUInt
+  // io.nextpc := Mux(valid && (~rst), 0x1c000000.U, nextpc)
+  val pc_add_src1 = io.offs_ext
   val pc_add_src2 = Mux(io.base_pc_from_rj, io.gr_rj, io.pc.asSInt)
   val nextpc = (pc_add_src1 + pc_add_src2).asUInt
-  io.nextpc := Mux(valid && (~rst), 0x1c000000.U, nextpc)
+  io.nextpc := nextpc
 }
 class IF_stage extends Module {
   val io = IO(new Bundle {
     val ready_go = Output(Bool())
     val valid = Output(Bool())
+    val br_taken = Input(Bool())
     val nextpc = Input(UInt(32.W))
     val inst_sram_rdata = Input(UInt(32.W))
     val inst = Output(UInt(32.W))
     val pc = Output(UInt(32.W))
   })
+  // val rstL = Reg(Bool())
+  // val rst = reset.asBool
+  // rstL := rst
+
+
+  val inst_pc = RegInit(0x1bfffffc.U)
+
+  inst_pc:=Mux(io.br_taken,io.nextpc,inst_pc+4.U)
+
   io.valid := RegInit(true.B)
   io.ready_go := true.B
   // RegInit(UInt(32.W), 0x1bfffffc.U)
   // val pc = Reg(UInt(32.W))
   // pc := io.nextpc
-  io.pc := io.nextpc
+  io.pc := inst_pc
   io.inst := io.inst_sram_rdata
 
 }
@@ -51,7 +64,7 @@ class ID_stage extends Module {
     val alu_op = Output(UInt(12.W))
     val mem_we = Output(Bool())
     val wb_from_mem = Output(Bool())
-    val base_pc_add_offs = Output(Bool())
+    val br_taken = Output(Bool())
     val base_pc_from_rj = Output(Bool())
     val pc_offs = Output(SInt(32.W))
     val src1 = Output(SInt(32.W))
@@ -96,7 +109,7 @@ class ID_stage extends Module {
   io.mem_we := inst_frag_decoder.io.cs.mem_we
   io.wb_from_mem := inst_frag_decoder.io.cs.wb_from_mem
   val sign_ext_offs26 = inst_frag_decoder.io.cs.sign_ext_offs26 //
-  io.base_pc_add_offs := inst_frag_decoder.io.cs.base_pc_add_offs
+  io.br_taken := inst_frag_decoder.io.cs.base_pc_add_offs
   io.base_pc_from_rj := inst_frag_decoder.io.cs.base_pc_from_rj
   // 寄存器堆
   val rf_regfile = Module(new RegFile())
@@ -295,7 +308,7 @@ class minicpu_top_pipline extends Module {
   if_stage.io.nextpc := pre_if.io.nextpc
   io.inst_sram_en := true.B
   io.inst_sram_we := 0.U
-  io.inst_sram_addr := pre_if.io.nextpc
+  io.inst_sram_addr := if_stage.io.pc
   io.inst_sram_wdata := 0.U
   if_stage.io.inst_sram_rdata := io.inst_sram_rdata
   ////////////////
@@ -306,11 +319,11 @@ class minicpu_top_pipline extends Module {
   //     val ready_go = Output(Bool())
   id_stage.io.inst := if_stage.io.inst
   id_stage.io.pc_in := if_stage.io.pc
-  pre_if.io.base_pc_add_offs := id_stage.io.base_pc_add_offs
   pre_if.io.base_pc_from_rj := id_stage.io.base_pc_from_rj
   pre_if.io.offs_ext := id_stage.io.pc_offs
   pre_if.io.gr_rj := id_stage.io.rf_data1
   pre_if.io.pc := id_stage.io.pc_out
+  if_stage.io.br_taken:=id_stage.io.br_taken
   ////////////////
   // 执行阶段EXE
   ////////////////

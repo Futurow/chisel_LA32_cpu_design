@@ -51,53 +51,55 @@
 `endif // not def SYNTHESIS
 
 module pre_IF(	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
-  input         clock,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
-                reset,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
   input  [31:0] io_offs_ext,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:4:14
                 io_gr_rj,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:4:14
                 io_pc,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:4:14
-  input         io_base_pc_add_offs,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:4:14
-                io_base_pc_from_rj,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:4:14
+  input         io_base_pc_from_rj,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:4:14
   output [31:0] io_nextpc	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:4:14
 );
 
-  reg valid;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:12:18
-  always @(posedge clock)	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
-    valid <= reset;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:12:18
-  `ifdef ENABLE_INITIAL_REG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
-      `FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
-    `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
-      automatic logic [31:0] _RANDOM[0:0];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
-      `ifdef INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
-        `INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
-      `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
-        _RANDOM[/*Zero width*/ 1'b0] = `RANDOM;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
-        valid = _RANDOM[/*Zero width*/ 1'b0][0];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7, :12:18
-      `endif // RANDOMIZE_REG_INIT
-    end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
-      `FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7
-    `endif // FIRRTL_AFTER_INITIAL
-  `endif // ENABLE_INITIAL_REG_
-  assign io_nextpc =
-    valid & ~reset
-      ? 32'h1C000000
-      : (io_base_pc_add_offs ? io_offs_ext : 32'h4)
-        + (io_base_pc_from_rj ? io_gr_rj : io_pc);	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7, :12:18, :16:24, :17:24, :18:29, :19:{19,26,30}
+  assign io_nextpc = io_offs_ext + (io_base_pc_from_rj ? io_gr_rj : io_pc);	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:3:7, :20:24, :21:29
 endmodule
 
-module IF_stage(	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:21:7
-  input  [31:0] io_nextpc,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:22:14
-                io_inst_sram_rdata,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:22:14
-  output [31:0] io_inst,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:22:14
-                io_pc	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:22:14
+module IF_stage(	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+  input         clock,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+                reset,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+                io_br_taken,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:25:14
+  input  [31:0] io_nextpc,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:25:14
+                io_inst_sram_rdata,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:25:14
+  output [31:0] io_inst,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:25:14
+                io_pc	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:25:14
 );
 
-  assign io_inst = io_inst_sram_rdata;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:21:7
-  assign io_pc = io_nextpc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:21:7
+  reg [31:0] inst_pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:34:24
+  always @(posedge clock) begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+    if (reset)	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+      inst_pc <= 32'h1C000000;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:34:24
+    else if (io_br_taken)	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:25:14
+      inst_pc <= io_nextpc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:34:24
+    else	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:25:14
+      inst_pc <= inst_pc + 32'h4;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:34:24, :35:45
+  end // always @(posedge)
+  `ifdef ENABLE_INITIAL_REG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+      `FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+    `endif // FIRRTL_BEFORE_INITIAL
+    initial begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+      automatic logic [31:0] _RANDOM[0:0];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+      `ifdef INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+        `INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+      `endif // INIT_RANDOM_PROLOG_
+      `ifdef RANDOMIZE_REG_INIT	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+        _RANDOM[/*Zero width*/ 1'b0] = `RANDOM;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+        inst_pc = _RANDOM[/*Zero width*/ 1'b0];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7, :34:24
+      `endif // RANDOMIZE_REG_INIT
+    end // initial
+    `ifdef FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+      `FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+    `endif // FIRRTL_AFTER_INITIAL
+  `endif // ENABLE_INITIAL_REG_
+  assign io_inst = io_inst_sram_rdata;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7
+  assign io_pc = inst_pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:24:7, :34:24
 endmodule
 
 module N_2N_Decoder(	// \\src\\main\\scala\\cpu\\tool.scala:4:7
@@ -483,64 +485,64 @@ module RegFile(	// \\src\\main\\scala\\cpu\\tool.scala:91:7
       : io_we & io_waddr == io_raddr2 ? io_wdata : _GEN[io_raddr2];	// \\src\\main\\scala\\cpu\\tool.scala:91:7, :103:28, :108:17, :109:{17,24,35}, :112:{19,30}
 endmodule
 
-module ID_stage(	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
-  input         clock,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
-                reset,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
-  input  [31:0] io_inst,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-                io_pc_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-  input         io_rf_we_WB,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-  input  [31:0] io_wb_data,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-  input  [4:0]  io_wb_addr_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-  output [4:0]  io_wb_addr_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-  output        io_rf_we_ID,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-  output [11:0] io_alu_op,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-  output        io_mem_we,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-                io_wb_from_mem,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-                io_base_pc_add_offs,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-                io_base_pc_from_rj,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-  output [31:0] io_pc_offs,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-                io_src1,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-                io_src2,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-                io_rf_data1,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-                io_rf_data2,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
-                io_pc_out	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:40:14
+module ID_stage(	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
+  input         clock,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
+                reset,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
+  input  [31:0] io_inst,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+                io_pc_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+  input         io_rf_we_WB,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+  input  [31:0] io_wb_data,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+  input  [4:0]  io_wb_addr_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+  output [4:0]  io_wb_addr_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+  output        io_rf_we_ID,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+  output [11:0] io_alu_op,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+  output        io_mem_we,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+                io_wb_from_mem,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+                io_br_taken,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+                io_base_pc_from_rj,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+  output [31:0] io_pc_offs,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+                io_src1,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+                io_src2,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+                io_rf_data1,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+                io_rf_data2,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
+                io_pc_out	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:47:14
 );
 
-  wire [31:0] _rf_regfile_io_rdata1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:102:26
-  wire [31:0] _rf_regfile_io_rdata2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:102:26
-  wire        _inst_frag_decoder_io_cs_src_reg_is_rd;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:86:33
-  wire        _inst_frag_decoder_io_cs_w_addr_is_1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:86:33
-  wire [3:0]  _inst_frag_decoder_io_cs_sel_src2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:86:33
-  wire        _inst_frag_decoder_io_cs_src1_is_pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:86:33
-  wire        _inst_frag_decoder_io_cs_sign_ext_offs26;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:86:33
-  reg  [31:0] pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:72:15
+  wire [31:0] _rf_regfile_io_rdata1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:109:26
+  wire [31:0] _rf_regfile_io_rdata2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:109:26
+  wire        _inst_frag_decoder_io_cs_src_reg_is_rd;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:93:33
+  wire        _inst_frag_decoder_io_cs_w_addr_is_1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:93:33
+  wire [3:0]  _inst_frag_decoder_io_cs_sel_src2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:93:33
+  wire        _inst_frag_decoder_io_cs_src1_is_pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:93:33
+  wire        _inst_frag_decoder_io_cs_sign_ext_offs26;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:93:33
+  reg  [31:0] pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:79:15
   wire [9:0]  _GEN =
-    _inst_frag_decoder_io_cs_sign_ext_offs26 ? io_inst[9:0] : {10{io_inst[25]}};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:83:24, :86:33, :123:20
-  always @(posedge clock)	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
-    pc <= io_pc_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:72:15
-  `ifdef ENABLE_INITIAL_REG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
-      `FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
+    _inst_frag_decoder_io_cs_sign_ext_offs26 ? io_inst[9:0] : {10{io_inst[25]}};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:90:24, :93:33, :130:20
+  always @(posedge clock)	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
+    pc <= io_pc_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:79:15
+  `ifdef ENABLE_INITIAL_REG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
+      `FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
-      automatic logic [31:0] _RANDOM[0:1];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
-      `ifdef INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
-        `INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
+    initial begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
+      automatic logic [31:0] _RANDOM[0:1];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
+      `ifdef INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
+        `INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
+      `ifdef RANDOMIZE_REG_INIT	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
         for (logic [1:0] i = 2'h0; i < 2'h2; i += 2'h1) begin
-          _RANDOM[i[0]] = `RANDOM;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
-        end	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
-        pc = {_RANDOM[1'h0][31:1], _RANDOM[1'h1][0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7, :72:15
+          _RANDOM[i[0]] = `RANDOM;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
+        end	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
+        pc = {_RANDOM[1'h0][31:1], _RANDOM[1'h1][0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7, :79:15
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
-      `FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
+    `ifdef FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
+      `FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  Inst_Frag_Decoder inst_frag_decoder (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:86:33
-    .io_op                  (io_inst[31:15]),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:76:21
-    .io_rj_eq_rd            (_rf_regfile_io_rdata1 == _rf_regfile_io_rdata2),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:102:26, :113:22
+  Inst_Frag_Decoder inst_frag_decoder (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:93:33
+    .io_op                  (io_inst[31:15]),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:83:21
+    .io_rj_eq_rd            (_rf_regfile_io_rdata1 == _rf_regfile_io_rdata2),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:109:26, :120:22
     .io_cs_src_reg_is_rd    (_inst_frag_decoder_io_cs_src_reg_is_rd),
     .io_cs_w_addr_is_1      (_inst_frag_decoder_io_cs_w_addr_is_1),
     .io_cs_rf_we            (io_rf_we_ID),
@@ -550,31 +552,31 @@ module ID_stage(	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7
     .io_cs_mem_we           (io_mem_we),
     .io_cs_wb_from_mem      (io_wb_from_mem),
     .io_cs_sign_ext_offs26  (_inst_frag_decoder_io_cs_sign_ext_offs26),
-    .io_cs_base_pc_add_offs (io_base_pc_add_offs),
+    .io_cs_base_pc_add_offs (io_br_taken),
     .io_cs_base_pc_from_rj  (io_base_pc_from_rj)
   );
-  RegFile rf_regfile (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:102:26
+  RegFile rf_regfile (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:109:26
     .clock     (clock),
     .reset     (reset),
-    .io_raddr1 (io_inst[9:5]),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:77:16
-    .io_raddr2 (_inst_frag_decoder_io_cs_src_reg_is_rd ? io_inst[4:0] : io_inst[14:10]),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:78:16, :79:16, :86:33, :107:30
+    .io_raddr1 (io_inst[9:5]),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:84:16
+    .io_raddr2 (_inst_frag_decoder_io_cs_src_reg_is_rd ? io_inst[4:0] : io_inst[14:10]),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:85:16, :86:16, :93:33, :114:30
     .io_rdata1 (_rf_regfile_io_rdata1),
     .io_rdata2 (_rf_regfile_io_rdata2),
     .io_we     (io_rf_we_WB),
     .io_waddr  (io_wb_addr_in),
     .io_wdata  (io_wb_data)
   );
-  assign io_wb_addr_out = _inst_frag_decoder_io_cs_w_addr_is_1 ? 5'h1 : io_inst[4:0];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7, :79:16, :86:33, :104:18
-  assign io_pc_offs = {{4{_GEN[9]}}, _GEN, io_inst[25:10], 2'h0};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7, :82:20, :123:{14,20}
-  assign io_src1 = _inst_frag_decoder_io_cs_src1_is_pc ? pc : _rf_regfile_io_rdata1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7, :72:15, :86:33, :102:26, :119:17
+  assign io_wb_addr_out = _inst_frag_decoder_io_cs_w_addr_is_1 ? 5'h1 : io_inst[4:0];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7, :86:16, :93:33, :111:18
+  assign io_pc_offs = {{4{_GEN[9]}}, _GEN, io_inst[25:10], 2'h0};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7, :89:20, :130:{14,20}
+  assign io_src1 = _inst_frag_decoder_io_cs_src1_is_pc ? pc : _rf_regfile_io_rdata1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7, :79:15, :93:33, :109:26, :126:17
   assign io_src2 =
     {29'h0, _inst_frag_decoder_io_cs_sel_src2[0], 2'h0}
     | (_inst_frag_decoder_io_cs_sel_src2[1] ? {io_inst[24:5], 12'h0} : 32'h0)
     | (_inst_frag_decoder_io_cs_sel_src2[2] ? {{20{io_inst[21]}}, io_inst[21:10]} : 32'h0)
-    | (_inst_frag_decoder_io_cs_sel_src2[3] ? _rf_regfile_io_rdata2 : 32'h0);	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7, :80:18, :81:18, :86:33, :102:26, :117:23, src/main/scala/chisel3/util/Mux.scala:30:73, :32:36
-  assign io_rf_data1 = _rf_regfile_io_rdata1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7, :102:26
-  assign io_rf_data2 = _rf_regfile_io_rdata2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7, :102:26
-  assign io_pc_out = pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:39:7, :72:15
+    | (_inst_frag_decoder_io_cs_sel_src2[3] ? _rf_regfile_io_rdata2 : 32'h0);	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7, :87:18, :88:18, :93:33, :109:26, :124:23, src/main/scala/chisel3/util/Mux.scala:30:73, :32:36
+  assign io_rf_data1 = _rf_regfile_io_rdata1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7, :109:26
+  assign io_rf_data2 = _rf_regfile_io_rdata2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7, :109:26
+  assign io_pc_out = pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:46:7, :79:15
 endmodule
 
 module ALU(	// \\src\\main\\scala\\cpu\\tool.scala:114:7
@@ -603,335 +605,335 @@ module ALU(	// \\src\\main\\scala\\cpu\\tool.scala:114:7
   assign io_mem_addr = _add_w_res_T;	// \\src\\main\\scala\\cpu\\tool.scala:114:7, :126:27
 endmodule
 
-module EXE_stage(	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
-  input         clock,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
-  input  [31:0] io_src1,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-                io_src2,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-                io_rf_data2,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-  input  [11:0] io_alu_op,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-  input         io_mem_we_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-  output        io_mem_we_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-  input         io_wb_from_mem_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-  output        io_wb_from_mem_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-  input         io_rf_we_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-  output        io_rf_we_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-  output [31:0] io_alu_res,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-                io_mem_addr,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-                io_mem_data,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-  input  [4:0]  io_wb_addr_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-  output [4:0]  io_wb_addr_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-  input  [31:0] io_pc_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
-  output [31:0] io_pc_out	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:130:14
+module EXE_stage(	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
+  input         clock,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
+  input  [31:0] io_src1,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+                io_src2,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+                io_rf_data2,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+  input  [11:0] io_alu_op,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+  input         io_mem_we_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+  output        io_mem_we_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+  input         io_wb_from_mem_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+  output        io_wb_from_mem_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+  input         io_rf_we_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+  output        io_rf_we_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+  output [31:0] io_alu_res,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+                io_mem_addr,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+                io_mem_data,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+  input  [4:0]  io_wb_addr_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+  output [4:0]  io_wb_addr_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+  input  [31:0] io_pc_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
+  output [31:0] io_pc_out	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:137:14
 );
 
-  reg [31:0] pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:157:15
-  reg [4:0]  wb_addr;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:161:20
-  reg [31:0] src1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:165:17
-  reg [31:0] src2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:166:17
-  reg [11:0] alu_op;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:167:19
-  reg        mem_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:170:19
-  reg        wb_from_mem;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:174:24
-  reg        rf_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:178:18
-  reg [31:0] rf_data2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:190:21
-  always @(posedge clock) begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
-    pc <= io_pc_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:157:15
-    wb_addr <= io_wb_addr_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:161:20
-    src1 <= io_src1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:165:17
-    src2 <= io_src2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:166:17
-    alu_op <= io_alu_op;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:167:19
-    mem_we <= io_mem_we_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:170:19
-    wb_from_mem <= io_wb_from_mem_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:174:24
-    rf_we <= io_rf_we_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:178:18
-    rf_data2 <= io_rf_data2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:190:21
+  reg [31:0] pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:164:15
+  reg [4:0]  wb_addr;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:168:20
+  reg [31:0] src1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:172:17
+  reg [31:0] src2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:173:17
+  reg [11:0] alu_op;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:174:19
+  reg        mem_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:177:19
+  reg        wb_from_mem;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:181:24
+  reg        rf_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:185:18
+  reg [31:0] rf_data2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:197:21
+  always @(posedge clock) begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
+    pc <= io_pc_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:164:15
+    wb_addr <= io_wb_addr_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:168:20
+    src1 <= io_src1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:172:17
+    src2 <= io_src2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:173:17
+    alu_op <= io_alu_op;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:174:19
+    mem_we <= io_mem_we_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:177:19
+    wb_from_mem <= io_wb_from_mem_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:181:24
+    rf_we <= io_rf_we_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:185:18
+    rf_data2 <= io_rf_data2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:197:21
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
-      `FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
+  `ifdef ENABLE_INITIAL_REG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
+      `FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
-      automatic logic [31:0] _RANDOM[0:4];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
-      `ifdef INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
-        `INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
+    initial begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
+      automatic logic [31:0] _RANDOM[0:4];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
+      `ifdef INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
+        `INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
+      `ifdef RANDOMIZE_REG_INIT	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
         for (logic [2:0] i = 3'h0; i < 3'h5; i += 3'h1) begin
-          _RANDOM[i] = `RANDOM;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
-        end	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
-        pc = {_RANDOM[3'h0][31:1], _RANDOM[3'h1][0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :157:15
-        wb_addr = _RANDOM[3'h1][5:1];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :157:15, :161:20
-        src1 = {_RANDOM[3'h1][31:6], _RANDOM[3'h2][5:0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :157:15, :165:17
-        src2 = {_RANDOM[3'h2][31:6], _RANDOM[3'h3][5:0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :165:17, :166:17
-        alu_op = _RANDOM[3'h3][17:6];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :166:17, :167:19
-        mem_we = _RANDOM[3'h3][18];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :166:17, :170:19
-        wb_from_mem = _RANDOM[3'h3][19];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :166:17, :174:24
-        rf_we = _RANDOM[3'h3][20];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :166:17, :178:18
-        rf_data2 = {_RANDOM[3'h3][31:21], _RANDOM[3'h4][20:0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :166:17, :190:21
+          _RANDOM[i] = `RANDOM;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
+        end	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
+        pc = {_RANDOM[3'h0][31:1], _RANDOM[3'h1][0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :164:15
+        wb_addr = _RANDOM[3'h1][5:1];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :164:15, :168:20
+        src1 = {_RANDOM[3'h1][31:6], _RANDOM[3'h2][5:0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :164:15, :172:17
+        src2 = {_RANDOM[3'h2][31:6], _RANDOM[3'h3][5:0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :172:17, :173:17
+        alu_op = _RANDOM[3'h3][17:6];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :173:17, :174:19
+        mem_we = _RANDOM[3'h3][18];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :173:17, :177:19
+        wb_from_mem = _RANDOM[3'h3][19];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :173:17, :181:24
+        rf_we = _RANDOM[3'h3][20];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :173:17, :185:18
+        rf_data2 = {_RANDOM[3'h3][31:21], _RANDOM[3'h4][20:0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :173:17, :197:21
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
-      `FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7
+    `ifdef FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
+      `FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  ALU alu (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:184:19
-    .io_alu_op   (alu_op),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:167:19
-    .io_src1     (src1),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:165:17
-    .io_src2     (src2),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:166:17
+  ALU alu (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:191:19
+    .io_alu_op   (alu_op),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:174:19
+    .io_src1     (src1),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:172:17
+    .io_src2     (src2),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:173:17
     .io_alu_res  (io_alu_res),
     .io_mem_addr (io_mem_addr)
   );
-  assign io_mem_we_out = mem_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :170:19
-  assign io_wb_from_mem_out = wb_from_mem;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :174:24
-  assign io_rf_we_out = rf_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :178:18
-  assign io_mem_data = rf_data2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :190:21
-  assign io_wb_addr_out = wb_addr;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :161:20
-  assign io_pc_out = pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:129:7, :157:15
+  assign io_mem_we_out = mem_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :177:19
+  assign io_wb_from_mem_out = wb_from_mem;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :181:24
+  assign io_rf_we_out = rf_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :185:18
+  assign io_mem_data = rf_data2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :197:21
+  assign io_wb_addr_out = wb_addr;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :168:20
+  assign io_pc_out = pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:136:7, :164:15
 endmodule
 
-module MEM_stage(	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
-  input         clock,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
-  input  [31:0] io_alu_res,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:196:14
-  output [31:0] io_wb_data,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:196:14
-  input         io_wb_from_mem,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:196:14
-  input  [31:0] io_mem_value,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:196:14
-  input         io_rf_we_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:196:14
-  output        io_rf_we_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:196:14
-  input  [4:0]  io_wb_addr_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:196:14
-  output [4:0]  io_wb_addr_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:196:14
-  input  [31:0] io_pc_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:196:14
-  output [31:0] io_pc_out	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:196:14
+module MEM_stage(	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
+  input         clock,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
+  input  [31:0] io_alu_res,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:203:14
+  output [31:0] io_wb_data,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:203:14
+  input         io_wb_from_mem,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:203:14
+  input  [31:0] io_mem_value,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:203:14
+  input         io_rf_we_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:203:14
+  output        io_rf_we_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:203:14
+  input  [4:0]  io_wb_addr_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:203:14
+  output [4:0]  io_wb_addr_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:203:14
+  input  [31:0] io_pc_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:203:14
+  output [31:0] io_pc_out	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:203:14
 );
 
-  reg [31:0] pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:216:15
-  reg [4:0]  wb_addr;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:220:20
-  reg [31:0] alu_res;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:224:20
-  reg        rf_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:226:18
-  reg        wb_from_mem;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:230:24
-  always @(posedge clock) begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
-    pc <= io_pc_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:216:15
-    wb_addr <= io_wb_addr_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:220:20
-    alu_res <= io_alu_res;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:224:20
-    rf_we <= io_rf_we_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:226:18
-    wb_from_mem <= io_wb_from_mem;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:230:24
+  reg [31:0] pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:223:15
+  reg [4:0]  wb_addr;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:227:20
+  reg [31:0] alu_res;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:231:20
+  reg        rf_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:233:18
+  reg        wb_from_mem;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:237:24
+  always @(posedge clock) begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
+    pc <= io_pc_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:223:15
+    wb_addr <= io_wb_addr_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:227:20
+    alu_res <= io_alu_res;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:231:20
+    rf_we <= io_rf_we_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:233:18
+    wb_from_mem <= io_wb_from_mem;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:237:24
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
-      `FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
+  `ifdef ENABLE_INITIAL_REG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
+      `FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
-      automatic logic [31:0] _RANDOM[0:2];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
-      `ifdef INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
-        `INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
+    initial begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
+      automatic logic [31:0] _RANDOM[0:2];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
+      `ifdef INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
+        `INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
+      `ifdef RANDOMIZE_REG_INIT	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
         for (logic [1:0] i = 2'h0; i < 2'h3; i += 2'h1) begin
-          _RANDOM[i] = `RANDOM;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
-        end	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
-        pc = {_RANDOM[2'h0][31:1], _RANDOM[2'h1][0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7, :216:15
-        wb_addr = _RANDOM[2'h1][5:1];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7, :216:15, :220:20
-        alu_res = {_RANDOM[2'h1][31:6], _RANDOM[2'h2][5:0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7, :216:15, :224:20
-        rf_we = _RANDOM[2'h2][6];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7, :224:20, :226:18
-        wb_from_mem = _RANDOM[2'h2][7];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7, :224:20, :230:24
+          _RANDOM[i] = `RANDOM;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
+        end	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
+        pc = {_RANDOM[2'h0][31:1], _RANDOM[2'h1][0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7, :223:15
+        wb_addr = _RANDOM[2'h1][5:1];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7, :223:15, :227:20
+        alu_res = {_RANDOM[2'h1][31:6], _RANDOM[2'h2][5:0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7, :223:15, :231:20
+        rf_we = _RANDOM[2'h2][6];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7, :231:20, :233:18
+        wb_from_mem = _RANDOM[2'h2][7];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7, :231:20, :237:24
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
-      `FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7
+    `ifdef FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
+      `FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_wb_data = wb_from_mem ? io_mem_value : alu_res;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7, :224:20, :230:24, :233:20
-  assign io_rf_we_out = rf_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7, :226:18
-  assign io_wb_addr_out = wb_addr;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7, :220:20
-  assign io_pc_out = pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:195:7, :216:15
+  assign io_wb_data = wb_from_mem ? io_mem_value : alu_res;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7, :231:20, :237:24, :240:20
+  assign io_rf_we_out = rf_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7, :233:18
+  assign io_wb_addr_out = wb_addr;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7, :227:20
+  assign io_pc_out = pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:202:7, :223:15
 endmodule
 
-module WB_stage(	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
-  input         clock,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
-  input  [31:0] io_wb_data_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:236:14
-  output [31:0] io_wb_data_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:236:14
-  input         io_rf_we_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:236:14
-  output        io_rf_we_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:236:14
-  input  [4:0]  io_wb_addr_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:236:14
-  output [4:0]  io_wb_addr_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:236:14
-  input  [31:0] io_pc_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:236:14
-  output [31:0] io_pc_out	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:236:14
+module WB_stage(	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
+  input         clock,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
+  input  [31:0] io_wb_data_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:243:14
+  output [31:0] io_wb_data_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:243:14
+  input         io_rf_we_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:243:14
+  output        io_rf_we_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:243:14
+  input  [4:0]  io_wb_addr_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:243:14
+  output [4:0]  io_wb_addr_out,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:243:14
+  input  [31:0] io_pc_in,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:243:14
+  output [31:0] io_pc_out	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:243:14
 );
 
-  reg [31:0] pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:254:15
-  reg [31:0] wb_data;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:258:20
-  reg [4:0]  wb_addr;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:262:20
-  reg        rf_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:266:18
-  always @(posedge clock) begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
-    pc <= io_pc_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:254:15
-    wb_data <= io_wb_data_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:258:20
-    wb_addr <= io_wb_addr_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:262:20
-    rf_we <= io_rf_we_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:266:18
+  reg [31:0] pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:261:15
+  reg [31:0] wb_data;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:265:20
+  reg [4:0]  wb_addr;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:269:20
+  reg        rf_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:273:18
+  always @(posedge clock) begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
+    pc <= io_pc_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:261:15
+    wb_data <= io_wb_data_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:265:20
+    wb_addr <= io_wb_addr_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:269:20
+    rf_we <= io_rf_we_in;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:273:18
   end // always @(posedge)
-  `ifdef ENABLE_INITIAL_REG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
-    `ifdef FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
-      `FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
+  `ifdef ENABLE_INITIAL_REG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
+    `ifdef FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
+      `FIRRTL_BEFORE_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
     `endif // FIRRTL_BEFORE_INITIAL
-    initial begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
-      automatic logic [31:0] _RANDOM[0:2];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
-      `ifdef INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
-        `INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
+    initial begin	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
+      automatic logic [31:0] _RANDOM[0:2];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
+      `ifdef INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
+        `INIT_RANDOM_PROLOG_	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
       `endif // INIT_RANDOM_PROLOG_
-      `ifdef RANDOMIZE_REG_INIT	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
+      `ifdef RANDOMIZE_REG_INIT	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
         for (logic [1:0] i = 2'h0; i < 2'h3; i += 2'h1) begin
-          _RANDOM[i] = `RANDOM;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
-        end	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
-        pc = {_RANDOM[2'h0][31:1], _RANDOM[2'h1][0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7, :254:15
-        wb_data = {_RANDOM[2'h1][31:1], _RANDOM[2'h2][0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7, :254:15, :258:20
-        wb_addr = _RANDOM[2'h2][5:1];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7, :258:20, :262:20
-        rf_we = _RANDOM[2'h2][6];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7, :258:20, :266:18
+          _RANDOM[i] = `RANDOM;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
+        end	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
+        pc = {_RANDOM[2'h0][31:1], _RANDOM[2'h1][0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7, :261:15
+        wb_data = {_RANDOM[2'h1][31:1], _RANDOM[2'h2][0]};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7, :261:15, :265:20
+        wb_addr = _RANDOM[2'h2][5:1];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7, :265:20, :269:20
+        rf_we = _RANDOM[2'h2][6];	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7, :265:20, :273:18
       `endif // RANDOMIZE_REG_INIT
     end // initial
-    `ifdef FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
-      `FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7
+    `ifdef FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
+      `FIRRTL_AFTER_INITIAL	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7
     `endif // FIRRTL_AFTER_INITIAL
   `endif // ENABLE_INITIAL_REG_
-  assign io_wb_data_out = wb_data;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7, :258:20
-  assign io_rf_we_out = rf_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7, :266:18
-  assign io_wb_addr_out = wb_addr;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7, :262:20
-  assign io_pc_out = pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:235:7, :254:15
+  assign io_wb_data_out = wb_data;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7, :265:20
+  assign io_rf_we_out = rf_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7, :273:18
+  assign io_wb_addr_out = wb_addr;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7, :269:20
+  assign io_pc_out = pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:242:7, :261:15
 endmodule
 
-module minicpu_top_pipline(	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:271:7
-  input         clock,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:271:7
-                reset,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:271:7
-  output        io_inst_sram_en,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:272:14
-  output [3:0]  io_inst_sram_we,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:272:14
-  output [31:0] io_inst_sram_addr,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:272:14
-                io_inst_sram_wdata,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:272:14
-  input  [31:0] io_inst_sram_rdata,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:272:14
-  output        io_data_sram_en,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:272:14
-  output [3:0]  io_data_sram_we,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:272:14
-  output [31:0] io_data_sram_addr,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:272:14
-                io_data_sram_wdata,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:272:14
-  input  [31:0] io_data_sram_rdata,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:272:14
-  output [31:0] io_debug_wb_pc,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:272:14
-  output [3:0]  io_debug_wb_rf_we,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:272:14
-  output [4:0]  io_debug_wb_rf_wnum,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:272:14
-  output [31:0] io_debug_wb_rf_wdata	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:272:14
+module minicpu_top_pipline(	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:278:7
+  input         clock,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:278:7
+                reset,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:278:7
+  output        io_inst_sram_en,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:279:14
+  output [3:0]  io_inst_sram_we,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:279:14
+  output [31:0] io_inst_sram_addr,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:279:14
+                io_inst_sram_wdata,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:279:14
+  input  [31:0] io_inst_sram_rdata,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:279:14
+  output        io_data_sram_en,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:279:14
+  output [3:0]  io_data_sram_we,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:279:14
+  output [31:0] io_data_sram_addr,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:279:14
+                io_data_sram_wdata,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:279:14
+  input  [31:0] io_data_sram_rdata,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:279:14
+  output [31:0] io_debug_wb_pc,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:279:14
+  output [3:0]  io_debug_wb_rf_we,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:279:14
+  output [4:0]  io_debug_wb_rf_wnum,	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:279:14
+  output [31:0] io_debug_wb_rf_wdata	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:279:14
 );
 
-  wire [31:0] _wb_stage_io_wb_data_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:349:24
-  wire        _wb_stage_io_rf_we_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:349:24
-  wire [4:0]  _wb_stage_io_wb_addr_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:349:24
-  wire [31:0] _mem_stage_io_wb_data;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:332:25
-  wire        _mem_stage_io_rf_we_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:332:25
-  wire [4:0]  _mem_stage_io_wb_addr_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:332:25
-  wire [31:0] _mem_stage_io_pc_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:332:25
-  wire        _exe_stage_io_mem_we_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:317:25
-  wire        _exe_stage_io_wb_from_mem_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:317:25
-  wire        _exe_stage_io_rf_we_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:317:25
-  wire [31:0] _exe_stage_io_alu_res;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:317:25
-  wire [4:0]  _exe_stage_io_wb_addr_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:317:25
-  wire [31:0] _exe_stage_io_pc_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:317:25
-  wire [4:0]  _id_stage_io_wb_addr_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-  wire        _id_stage_io_rf_we_ID;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-  wire [11:0] _id_stage_io_alu_op;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-  wire        _id_stage_io_mem_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-  wire        _id_stage_io_wb_from_mem;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-  wire        _id_stage_io_base_pc_add_offs;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-  wire        _id_stage_io_base_pc_from_rj;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-  wire [31:0] _id_stage_io_pc_offs;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-  wire [31:0] _id_stage_io_src1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-  wire [31:0] _id_stage_io_src2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-  wire [31:0] _id_stage_io_rf_data1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-  wire [31:0] _id_stage_io_rf_data2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-  wire [31:0] _id_stage_io_pc_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-  wire [31:0] _if_stage_io_inst;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:294:24
-  wire [31:0] _if_stage_io_pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:294:24
-  wire [31:0] _pre_if_io_nextpc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:290:22
-  pre_IF pre_if (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:290:22
-    .clock               (clock),
-    .reset               (reset),
-    .io_offs_ext         (_id_stage_io_pc_offs),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-    .io_gr_rj            (_id_stage_io_rf_data1),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-    .io_pc               (_id_stage_io_pc_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-    .io_base_pc_add_offs (_id_stage_io_base_pc_add_offs),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-    .io_base_pc_from_rj  (_id_stage_io_base_pc_from_rj),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-    .io_nextpc           (_pre_if_io_nextpc)
+  wire [31:0] _wb_stage_io_wb_data_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:356:24
+  wire        _wb_stage_io_rf_we_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:356:24
+  wire [4:0]  _wb_stage_io_wb_addr_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:356:24
+  wire [31:0] _mem_stage_io_wb_data;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:339:25
+  wire        _mem_stage_io_rf_we_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:339:25
+  wire [4:0]  _mem_stage_io_wb_addr_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:339:25
+  wire [31:0] _mem_stage_io_pc_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:339:25
+  wire        _exe_stage_io_mem_we_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:324:25
+  wire        _exe_stage_io_wb_from_mem_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:324:25
+  wire        _exe_stage_io_rf_we_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:324:25
+  wire [31:0] _exe_stage_io_alu_res;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:324:25
+  wire [4:0]  _exe_stage_io_wb_addr_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:324:25
+  wire [31:0] _exe_stage_io_pc_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:324:25
+  wire [4:0]  _id_stage_io_wb_addr_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+  wire        _id_stage_io_rf_we_ID;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+  wire [11:0] _id_stage_io_alu_op;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+  wire        _id_stage_io_mem_we;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+  wire        _id_stage_io_wb_from_mem;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+  wire        _id_stage_io_br_taken;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+  wire        _id_stage_io_base_pc_from_rj;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+  wire [31:0] _id_stage_io_pc_offs;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+  wire [31:0] _id_stage_io_src1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+  wire [31:0] _id_stage_io_src2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+  wire [31:0] _id_stage_io_rf_data1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+  wire [31:0] _id_stage_io_rf_data2;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+  wire [31:0] _id_stage_io_pc_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+  wire [31:0] _if_stage_io_inst;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:301:24
+  wire [31:0] _if_stage_io_pc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:301:24
+  wire [31:0] _pre_if_io_nextpc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:297:22
+  pre_IF pre_if (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:297:22
+    .io_offs_ext        (_id_stage_io_pc_offs),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+    .io_gr_rj           (_id_stage_io_rf_data1),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+    .io_pc              (_id_stage_io_pc_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+    .io_base_pc_from_rj (_id_stage_io_base_pc_from_rj),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+    .io_nextpc          (_pre_if_io_nextpc)
   );
-  IF_stage if_stage (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:294:24
-    .io_nextpc          (_pre_if_io_nextpc),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:290:22
+  IF_stage if_stage (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:301:24
+    .clock              (clock),
+    .reset              (reset),
+    .io_br_taken        (_id_stage_io_br_taken),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+    .io_nextpc          (_pre_if_io_nextpc),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:297:22
     .io_inst_sram_rdata (io_inst_sram_rdata),
     .io_inst            (_if_stage_io_inst),
     .io_pc              (_if_stage_io_pc)
   );
-  ID_stage id_stage (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-    .clock               (clock),
-    .reset               (reset),
-    .io_inst             (_if_stage_io_inst),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:294:24
-    .io_pc_in            (_if_stage_io_pc),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:294:24
-    .io_rf_we_WB         (_wb_stage_io_rf_we_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:349:24
-    .io_wb_data          (_wb_stage_io_wb_data_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:349:24
-    .io_wb_addr_in       (_wb_stage_io_wb_addr_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:349:24
-    .io_wb_addr_out      (_id_stage_io_wb_addr_out),
-    .io_rf_we_ID         (_id_stage_io_rf_we_ID),
-    .io_alu_op           (_id_stage_io_alu_op),
-    .io_mem_we           (_id_stage_io_mem_we),
-    .io_wb_from_mem      (_id_stage_io_wb_from_mem),
-    .io_base_pc_add_offs (_id_stage_io_base_pc_add_offs),
-    .io_base_pc_from_rj  (_id_stage_io_base_pc_from_rj),
-    .io_pc_offs          (_id_stage_io_pc_offs),
-    .io_src1             (_id_stage_io_src1),
-    .io_src2             (_id_stage_io_src2),
-    .io_rf_data1         (_id_stage_io_rf_data1),
-    .io_rf_data2         (_id_stage_io_rf_data2),
-    .io_pc_out           (_id_stage_io_pc_out)
-  );
-  EXE_stage exe_stage (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:317:25
+  ID_stage id_stage (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
     .clock              (clock),
-    .io_src1            (_id_stage_io_src1),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-    .io_src2            (_id_stage_io_src2),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-    .io_rf_data2        (_id_stage_io_rf_data2),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-    .io_alu_op          (_id_stage_io_alu_op),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
-    .io_mem_we_in       (_id_stage_io_mem_we),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
+    .reset              (reset),
+    .io_inst            (_if_stage_io_inst),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:301:24
+    .io_pc_in           (_if_stage_io_pc),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:301:24
+    .io_rf_we_WB        (_wb_stage_io_rf_we_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:356:24
+    .io_wb_data         (_wb_stage_io_wb_data_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:356:24
+    .io_wb_addr_in      (_wb_stage_io_wb_addr_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:356:24
+    .io_wb_addr_out     (_id_stage_io_wb_addr_out),
+    .io_rf_we_ID        (_id_stage_io_rf_we_ID),
+    .io_alu_op          (_id_stage_io_alu_op),
+    .io_mem_we          (_id_stage_io_mem_we),
+    .io_wb_from_mem     (_id_stage_io_wb_from_mem),
+    .io_br_taken        (_id_stage_io_br_taken),
+    .io_base_pc_from_rj (_id_stage_io_base_pc_from_rj),
+    .io_pc_offs         (_id_stage_io_pc_offs),
+    .io_src1            (_id_stage_io_src1),
+    .io_src2            (_id_stage_io_src2),
+    .io_rf_data1        (_id_stage_io_rf_data1),
+    .io_rf_data2        (_id_stage_io_rf_data2),
+    .io_pc_out          (_id_stage_io_pc_out)
+  );
+  EXE_stage exe_stage (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:324:25
+    .clock              (clock),
+    .io_src1            (_id_stage_io_src1),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+    .io_src2            (_id_stage_io_src2),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+    .io_rf_data2        (_id_stage_io_rf_data2),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+    .io_alu_op          (_id_stage_io_alu_op),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
+    .io_mem_we_in       (_id_stage_io_mem_we),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
     .io_mem_we_out      (_exe_stage_io_mem_we_out),
-    .io_wb_from_mem_in  (_id_stage_io_wb_from_mem),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
+    .io_wb_from_mem_in  (_id_stage_io_wb_from_mem),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
     .io_wb_from_mem_out (_exe_stage_io_wb_from_mem_out),
-    .io_rf_we_in        (_id_stage_io_rf_we_ID),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
+    .io_rf_we_in        (_id_stage_io_rf_we_ID),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
     .io_rf_we_out       (_exe_stage_io_rf_we_out),
     .io_alu_res         (_exe_stage_io_alu_res),
     .io_mem_addr        (io_data_sram_addr),
     .io_mem_data        (io_data_sram_wdata),
-    .io_wb_addr_in      (_id_stage_io_wb_addr_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
+    .io_wb_addr_in      (_id_stage_io_wb_addr_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
     .io_wb_addr_out     (_exe_stage_io_wb_addr_out),
-    .io_pc_in           (_id_stage_io_pc_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:304:24
+    .io_pc_in           (_id_stage_io_pc_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:311:24
     .io_pc_out          (_exe_stage_io_pc_out)
   );
-  MEM_stage mem_stage (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:332:25
+  MEM_stage mem_stage (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:339:25
     .clock          (clock),
-    .io_alu_res     (_exe_stage_io_alu_res),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:317:25
+    .io_alu_res     (_exe_stage_io_alu_res),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:324:25
     .io_wb_data     (_mem_stage_io_wb_data),
-    .io_wb_from_mem (_exe_stage_io_wb_from_mem_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:317:25
+    .io_wb_from_mem (_exe_stage_io_wb_from_mem_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:324:25
     .io_mem_value   (io_data_sram_rdata),
-    .io_rf_we_in    (_exe_stage_io_rf_we_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:317:25
+    .io_rf_we_in    (_exe_stage_io_rf_we_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:324:25
     .io_rf_we_out   (_mem_stage_io_rf_we_out),
-    .io_wb_addr_in  (_exe_stage_io_wb_addr_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:317:25
+    .io_wb_addr_in  (_exe_stage_io_wb_addr_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:324:25
     .io_wb_addr_out (_mem_stage_io_wb_addr_out),
-    .io_pc_in       (_exe_stage_io_pc_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:317:25
+    .io_pc_in       (_exe_stage_io_pc_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:324:25
     .io_pc_out      (_mem_stage_io_pc_out)
   );
-  WB_stage wb_stage (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:349:24
+  WB_stage wb_stage (	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:356:24
     .clock          (clock),
-    .io_wb_data_in  (_mem_stage_io_wb_data),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:332:25
+    .io_wb_data_in  (_mem_stage_io_wb_data),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:339:25
     .io_wb_data_out (_wb_stage_io_wb_data_out),
-    .io_rf_we_in    (_mem_stage_io_rf_we_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:332:25
+    .io_rf_we_in    (_mem_stage_io_rf_we_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:339:25
     .io_rf_we_out   (_wb_stage_io_rf_we_out),
-    .io_wb_addr_in  (_mem_stage_io_wb_addr_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:332:25
+    .io_wb_addr_in  (_mem_stage_io_wb_addr_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:339:25
     .io_wb_addr_out (_wb_stage_io_wb_addr_out),
-    .io_pc_in       (_mem_stage_io_pc_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:332:25
+    .io_pc_in       (_mem_stage_io_pc_out),	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:339:25
     .io_pc_out      (io_debug_wb_pc)
   );
-  assign io_inst_sram_en = 1'h1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:271:7, :296:19
-  assign io_inst_sram_we = 4'h0;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:271:7, :297:19
-  assign io_inst_sram_addr = _pre_if_io_nextpc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:271:7, :290:22
-  assign io_inst_sram_wdata = 32'h0;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:271:7, :299:22
-  assign io_data_sram_en = 1'h1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:271:7, :296:19
-  assign io_data_sram_we = {2{{2{_exe_stage_io_mem_we_out}}}};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:271:7, :317:25, :339:25
-  assign io_debug_wb_rf_we = {2{{2{_wb_stage_io_rf_we_out}}}};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:271:7, :349:24, :363:27
-  assign io_debug_wb_rf_wnum = _wb_stage_io_wb_addr_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:271:7, :349:24
-  assign io_debug_wb_rf_wdata = _wb_stage_io_wb_data_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:271:7, :349:24
+  assign io_inst_sram_en = 1'h1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:278:7, :303:19
+  assign io_inst_sram_we = 4'h0;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:278:7, :304:19
+  assign io_inst_sram_addr = _pre_if_io_nextpc;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:278:7, :297:22
+  assign io_inst_sram_wdata = 32'h0;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:278:7, :306:22
+  assign io_data_sram_en = 1'h1;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:278:7, :303:19
+  assign io_data_sram_we = {2{{2{_exe_stage_io_mem_we_out}}}};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:278:7, :324:25, :346:25
+  assign io_debug_wb_rf_we = {2{{2{_wb_stage_io_rf_we_out}}}};	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:278:7, :356:24, :370:27
+  assign io_debug_wb_rf_wnum = _wb_stage_io_wb_addr_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:278:7, :356:24
+  assign io_debug_wb_rf_wdata = _wb_stage_io_wb_data_out;	// \\src\\main\\scala\\cpu\\minicpu_top_pipline.scala:278:7, :356:24
 endmodule
 
