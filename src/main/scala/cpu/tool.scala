@@ -105,11 +105,11 @@ class RegFile extends Module {
   when(io.we && io.waddr =/= 0.U) {
     reg(io.waddr) := io.wdata
   }
-  val rdata1=Mux(io.we &&(io.waddr===io.raddr1),io.wdata,reg(io.raddr1))
-  val rdata2=Mux(io.we &&(io.waddr===io.raddr2),io.wdata,reg(io.raddr2))
+  // val rdata1=Mux(io.we &&(io.waddr===io.raddr1),io.wdata,reg(io.raddr1))
+  // val rdata2=Mux(io.we &&(io.waddr===io.raddr2),io.wdata,reg(io.raddr2))
   // 读取对应地址的寄存器同时保证
-  io.rdata1 := Mux(io.raddr1 === 0.U, 0.S, rdata1)
-  io.rdata2 := Mux(io.raddr2 === 0.U, 0.S, rdata2)
+  io.rdata1 := Mux(io.raddr1 === 0.U, 0.S, reg(io.raddr1))
+  io.rdata2 := Mux(io.raddr2 === 0.U, 0.S, reg(io.raddr2))
 }
 class ALU extends Module {
 // val alu_op = Cat( alu_add,inst_sub_w,inst_slt,inst_sltu,
