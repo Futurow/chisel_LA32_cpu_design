@@ -23,36 +23,33 @@ class pre_IF extends Module {
 }
 class IF_stage extends Module {
   val io = IO(new Bundle {
-    val ready_go = Output(Bool())
+    val next_ready = Input(Bool())
     val valid = Output(Bool())
+    val inst_cancel = Input(Bool())
     val br_taken = Input(Bool())
     val nextpc = Input(UInt(32.W))
     val inst_sram_rdata = Input(UInt(32.W))
     val inst = Output(UInt(32.W))
+    val inst_sram_addr = Output(UInt(32.W))
     val pc = Output(UInt(32.W))
   })
-  // val rstL = Reg(Bool())
-  // val rst = reset.asBool
-  // rstL := rst
-
-
+  val valid = RegInit(false.B)
+  val ready= true.B
   val inst_pc = RegInit(0x1bfffffc.U)
+  valid:=true.B
+  // val inst_pc = RegInit(0x1c000000.U)
 
-  inst_pc:=Mux(io.br_taken,io.nextpc,inst_pc+4.U)
-
-  io.valid := RegInit(true.B)
-  io.ready_go := true.B
-  // RegInit(UInt(32.W), 0x1bfffffc.U)
-  // val pc = Reg(UInt(32.W))
-  // pc := io.nextpc
-  io.pc := inst_pc
+  io.valid:=valid
+  io.inst_sram_addr := Mux(io.br_taken,io.nextpc,inst_pc + 4.U)
+  inst_pc:=io.inst_sram_addr 
   io.inst := io.inst_sram_rdata
-
+  io.pc:=inst_pc
 }
 class ID_stage extends Module {
   val io = IO(new Bundle {
     val pre_valid = Input(Bool())
-    val ready_go = Output(Bool())
+    val next_ready = Input(Bool())
+    val ready = Output(Bool())
     val valid = Output(Bool())
     val inst = Input(UInt(32.W))
     val pc_in = Input(UInt(32.W))
@@ -72,18 +69,30 @@ class ID_stage extends Module {
     val rf_data1 = Output(SInt(32.W))
     val rf_data2 = Output(SInt(32.W))
     val pc_out = Output(UInt(32.W))
+    val need_rf_raddr1 = Output(Bool())
+    val need_rf_raddr2 = Output(Bool())
+    val rf_raddr1 = Output(UInt(5.W))
+    val rf_raddr2 = Output(UInt(5.W))
+    val needBlock = Input(Bool())
+    val inst_cancel = Output(Bool())
   })
-  io.ready_go := true.B
+  // io.ready := !io.needBlock
+  io.ready:=true.B
   val valid = RegInit(false.B)
-  valid := io.pre_valid
+  val inst = Reg(UInt(32.W))
+  val pc = Reg(UInt(32.W))
+  when(io.pre_valid&&io.ready){
+    valid := true.B
+    pc := io.pc_in
+    inst:=io.inst
+  }.elsewhen(valid&&io.next_ready){
+    valid := false.B
+  }
   io.valid := valid
 
   // val inst = RegInit(UInt(32.W), 0.U)
   // val inst = Reg(UInt(32.W))
-  val inst = io.inst
   // val pc = RegInit(UInt(32.W), 0x1c000000.U) // 0x1bfffffc
-  val pc = Reg(UInt(32.W))
-  pc := io.pc_in
   io.pc_out := pc
 
   val inst_op = inst(31, 15)
@@ -96,28 +105,33 @@ class ID_stage extends Module {
   val offs26 = Cat(inst(9, 0), inst(25, 10))
   // 译码
   val rj_eq_rd = Wire(Bool())
-  val inst_frag_decoder = Module(new Inst_Frag_Decoder())
+  val inst_frag_decoder = Module(new Inst_Frag_Decoder_pipline())
   inst_frag_decoder.io.op := inst_op
   inst_frag_decoder.io.rj_eq_rd := rj_eq_rd
   // 控制信号
   val src_reg_is_rd = inst_frag_decoder.io.cs.src_reg_is_rd //
   val w_addr_is_1 = inst_frag_decoder.io.cs.w_addr_is_1 //
-  io.rf_we_ID := inst_frag_decoder.io.cs.rf_we
+  io.rf_we_ID := inst_frag_decoder.io.cs.rf_we && io.valid
   val sel_src2 = inst_frag_decoder.io.cs.sel_src2 //
   val src1_is_pc = inst_frag_decoder.io.cs.src1_is_pc //
   io.alu_op := inst_frag_decoder.io.cs.alu_op
-  io.mem_we := inst_frag_decoder.io.cs.mem_we
+  io.mem_we := inst_frag_decoder.io.cs.mem_we && io.valid
   io.wb_from_mem := inst_frag_decoder.io.cs.wb_from_mem
   val sign_ext_offs26 = inst_frag_decoder.io.cs.sign_ext_offs26 //
-  io.br_taken := inst_frag_decoder.io.cs.base_pc_add_offs
+  io.br_taken := inst_frag_decoder.io.cs.base_pc_add_offs&&io.valid
   io.base_pc_from_rj := inst_frag_decoder.io.cs.base_pc_from_rj
+  io.need_rf_raddr1:=inst_frag_decoder.io.cs.need_rf_raddr1
+  io.need_rf_raddr2:=inst_frag_decoder.io.cs.need_rf_raddr2
+  io.inst_cancel:=inst_frag_decoder.io.cs.inst_cancel
   // 寄存器堆
   val rf_regfile = Module(new RegFile())
   val rf_waddr = Wire(UInt(5.W))
+  io.rf_raddr1:=rj
+  io.rf_raddr2:=Mux(src_reg_is_rd, rd, rk)
   rf_waddr := Mux(w_addr_is_1, 1.U(5.W), rd)
   io.wb_addr_out := rf_waddr
-  rf_regfile.io.raddr1 := rj
-  rf_regfile.io.raddr2 := Mux(src_reg_is_rd, rd, rk)
+  rf_regfile.io.raddr1 := io.rf_raddr1
+  rf_regfile.io.raddr2 := io.rf_raddr2
   rf_regfile.io.waddr := io.wb_addr_in
   rf_regfile.io.wdata := io.wb_data
   rf_regfile.io.we := io.rf_we_WB
@@ -142,7 +156,8 @@ class ID_stage extends Module {
 class EXE_stage extends Module {
   val io = IO(new Bundle {
     val pre_valid = Input(Bool())
-    val ready_go = Output(Bool())
+    val next_ready = Input(Bool())
+    val ready = Output(Bool())
     val valid = Output(Bool())
     val src1 = Input(SInt(32.W))
     val src2 = Input(SInt(32.W))
@@ -162,53 +177,57 @@ class EXE_stage extends Module {
     val pc_in = Input(UInt(32.W))
     val pc_out = Output(UInt(32.W))
   })
-  io.ready_go := true.B
+  io.ready := true.B
   val valid = RegInit(false.B)
-  valid := io.pre_valid
-  io.valid := valid
-
   val pc = Reg(UInt(32.W))
-  pc := io.pc_in
-  io.pc_out := pc
-
   val wb_addr = Reg(UInt(5.W))
-  wb_addr := io.wb_addr_in
-  io.wb_addr_out := wb_addr
-
   val src1 = Reg(SInt(32.W))
   val src2 = Reg(SInt(32.W))
   val alu_op = Reg(UInt(12.W))
-  alu_op := io.alu_op
 
   val mem_we = Reg(Bool())
-  mem_we := io.mem_we_in
-  io.mem_we_out := mem_we
-
   val wb_from_mem = Reg(Bool())
-  wb_from_mem := io.wb_from_mem_in
-  io.wb_from_mem_out := wb_from_mem
-
   val rf_we = Reg(Bool())
-  rf_we := io.rf_we_in
-  io.rf_we_out := rf_we
+  val rf_data2 = Reg(SInt(32.W))
+  when(io.pre_valid&&io.ready){
+    valid := true.B
+    pc := io.pc_in
+    wb_addr := io.wb_addr_in
 
-  src1 := io.src1
-  src2 := io.src2
+    alu_op := io.alu_op
+    src1 := io.src1
+    src2 := io.src2
+
+    mem_we := io.mem_we_in
+    wb_from_mem := io.wb_from_mem_in
+    rf_we := io.rf_we_in
+    rf_data2 := io.rf_data2
+  }.elsewhen(valid&&io.next_ready){
+    valid := false.B
+  }
+  io.valid := valid
+  io.pc_out := pc 
+  io.wb_addr_out := wb_addr
+
+
+  io.mem_we_out := mem_we && valid 
+  io.wb_from_mem_out := wb_from_mem
+  io.rf_we_out := rf_we && valid
+
   val alu = Module(new ALU())
   alu.io.alu_op := alu_op
   alu.io.src1 := src1
   alu.io.src2 := src2
   io.alu_res := alu.io.alu_res
   io.mem_addr := alu.io.mem_addr
-  val rf_data2 = Reg(SInt(32.W))
-  rf_data2 := io.rf_data2
   io.mem_data := rf_data2
 
 }
 class MEM_stage extends Module {
   val io = IO(new Bundle {
     val pre_valid = Input(Bool())
-    val ready_go = Output(Bool())
+    val next_ready = Input(Bool())
+    val ready = Output(Bool())
     val valid = Output(Bool())
     val alu_res = Input(SInt(32.W))
     val wb_data = Output(SInt(32.W))
@@ -221,34 +240,35 @@ class MEM_stage extends Module {
     val pc_in = Input(UInt(32.W))
     val pc_out = Output(UInt(32.W))
   })
-  io.ready_go := true.B
+  io.ready := true.B
   val valid = RegInit(false.B)
-  valid := io.pre_valid
-  io.valid := valid
-
   val pc = Reg(UInt(32.W))
-  pc := io.pc_in
-  io.pc_out := pc
-
   val wb_addr = Reg(UInt(5.W))
-  wb_addr := io.wb_addr_in
-  io.wb_addr_out := wb_addr
-
   val alu_res = Reg(SInt(32.W))
-  alu_res := io.alu_res
   val rf_we = Reg(Bool())
-  rf_we := io.rf_we_in
-  io.rf_we_out := rf_we
-
   val wb_from_mem = Reg(Bool())
-  wb_from_mem := io.wb_from_mem
+  when(io.pre_valid&&io.ready){
+    valid := true.B
+    pc := io.pc_in
+    wb_addr := io.wb_addr_in
+    alu_res := io.alu_res
+    rf_we := io.rf_we_in
+    wb_from_mem := io.wb_from_mem
+  }.elsewhen(valid&&io.next_ready){
+    valid:=false.B
+  }
+  io.valid := valid
+  io.pc_out := pc
+  io.wb_addr_out := wb_addr
+  io.rf_we_out := rf_we && valid
 
   io.wb_data := Mux(wb_from_mem, io.mem_value, alu_res)
 }
 class WB_stage extends Module {
   val io = IO(new Bundle {
     val pre_valid = Input(Bool())
-    val ready_go = Output(Bool())
+    val next_ready = Input(Bool())
+    val ready = Output(Bool())
     val valid = Output(Bool())
     val wb_data_in = Input(SInt(32.W))
     val wb_data_out = Output(SInt(32.W))
@@ -259,26 +279,27 @@ class WB_stage extends Module {
     val pc_in = Input(UInt(32.W))
     val pc_out = Output(UInt(32.W))
   })
-  io.ready_go := true.B
+  io.ready := true.B
   val valid = RegInit(false.B)
-  valid := io.pre_valid
-  io.valid := valid
-
   val pc = Reg(UInt(32.W))
-  pc := io.pc_in
+  val wb_data = Reg(SInt(32.W))
+  val wb_addr = Reg(UInt(5.W))
+  val rf_we = Reg(Bool())
+  when(io.pre_valid&&io.ready){
+    valid := true.B
+    pc := io.pc_in
+    wb_data := io.wb_data_in
+    wb_addr := io.wb_addr_in
+    rf_we := io.rf_we_in
+  }.elsewhen(valid&&io.next_ready){
+    valid:=false.B
+  }
+  io.valid := valid
   io.pc_out := pc
 
-  val wb_data = Reg(SInt(32.W))
-  wb_data := io.wb_data_in
   io.wb_data_out := wb_data
-
-  val wb_addr = Reg(UInt(5.W))
-  wb_addr := io.wb_addr_in
   io.wb_addr_out := wb_addr
-
-  val rf_we = Reg(Bool())
-  rf_we := io.rf_we_in
-  io.rf_we_out := rf_we
+  io.rf_we_out := rf_we&&valid
 
 }
 class minicpu_top_pipline extends Module {
@@ -302,13 +323,13 @@ class minicpu_top_pipline extends Module {
   })
   val pre_if = Module(new pre_IF())
   ////////////////
-  //// 取指阶段/////
+  //// 取指阶段////
   ////////////////
   val if_stage = Module(new IF_stage())
   if_stage.io.nextpc := pre_if.io.nextpc
   io.inst_sram_en := true.B
   io.inst_sram_we := 0.U
-  io.inst_sram_addr := if_stage.io.pc
+  io.inst_sram_addr := if_stage.io.inst_sram_addr
   io.inst_sram_wdata := 0.U
   if_stage.io.inst_sram_rdata := io.inst_sram_rdata
   ////////////////
@@ -316,7 +337,6 @@ class minicpu_top_pipline extends Module {
   ////////////////
   val id_stage = Module(new ID_stage())
   id_stage.io.pre_valid := if_stage.io.valid
-  //     val ready_go = Output(Bool())
   id_stage.io.inst := if_stage.io.inst
   id_stage.io.pc_in := if_stage.io.pc
   pre_if.io.base_pc_from_rj := id_stage.io.base_pc_from_rj
@@ -324,12 +344,12 @@ class minicpu_top_pipline extends Module {
   pre_if.io.gr_rj := id_stage.io.rf_data1
   pre_if.io.pc := id_stage.io.pc_out
   if_stage.io.br_taken:=id_stage.io.br_taken
+  if_stage.io.inst_cancel:=id_stage.io.inst_cancel
   ////////////////
   // 执行阶段EXE
   ////////////////
   val exe_stage = Module(new EXE_stage())
   exe_stage.io.pre_valid := id_stage.io.valid
-  //   val ready_go = Output(Bool())
   exe_stage.io.src1 := id_stage.io.src1
   exe_stage.io.src2 := id_stage.io.src2
   exe_stage.io.rf_data2 := id_stage.io.rf_data2
@@ -344,7 +364,6 @@ class minicpu_top_pipline extends Module {
   ////////////////
   val mem_stage = Module(new MEM_stage())
   mem_stage.io.pre_valid := exe_stage.io.valid
-  //   val ready_go = Output(Bool())
   mem_stage.io.alu_res := exe_stage.io.alu_res
   mem_stage.io.wb_from_mem := exe_stage.io.wb_from_mem_out
   io.data_sram_en := true.B
@@ -365,8 +384,6 @@ class minicpu_top_pipline extends Module {
   wb_stage.io.rf_we_in := mem_stage.io.rf_we_out
   wb_stage.io.wb_addr_in := mem_stage.io.wb_addr_out
   wb_stage.io.pc_in := mem_stage.io.pc_out
-  //   val ready_go = Output(Bool())
-  //   val valid = Output(Bool())
   val wb_rf_we = wb_stage.io.rf_we_out
   id_stage.io.rf_we_WB := wb_stage.io.rf_we_out
   id_stage.io.wb_data := wb_stage.io.wb_data_out
@@ -376,4 +393,31 @@ class minicpu_top_pipline extends Module {
   io.debug_wb_rf_we := Cat(wb_rf_we, wb_rf_we, wb_rf_we, wb_rf_we)
   io.debug_wb_rf_wnum := wb_stage.io.wb_addr_out
   io.debug_wb_rf_wdata := wb_stage.io.wb_data_out
+  // valid和ready信号传递
+  if_stage.io.next_ready:=id_stage.io.ready
+  
+  id_stage.io.pre_valid:=if_stage.io.valid
+  id_stage.io.next_ready:=exe_stage.io.ready
+
+  exe_stage.io.pre_valid:=id_stage.io.valid
+  exe_stage.io.next_ready:=mem_stage.io.ready
+
+  mem_stage.io.pre_valid:=exe_stage.io.valid
+  mem_stage.io.next_ready:=wb_stage.io.ready
+
+  wb_stage.io.pre_valid:=mem_stage.io.valid
+  wb_stage.io.next_ready:=true.B
+  //阻塞控制
+  val block_judge = Module(new Block_Judge())
+  block_judge.io.need_rf_raddr1:=id_stage.io.need_rf_raddr1
+  block_judge.io.need_rf_raddr2:=id_stage.io.need_rf_raddr2
+  block_judge.io.rf_raddr1:=id_stage.io.rf_raddr1
+  block_judge.io.rf_raddr2:=id_stage.io.rf_raddr2
+  block_judge.io.exe_rf_we   :=exe_stage.io.rf_we_out
+  block_judge.io.exe_rf_waddr:=exe_stage.io.wb_addr_out
+  block_judge.io.mem_rf_we   :=mem_stage.io.rf_we_out
+  block_judge.io.mem_rf_waddr:=mem_stage.io.wb_addr_out
+  block_judge.io.wb_rf_we    :=wb_stage.io.rf_we_out
+  block_judge.io.wb_rf_waddr :=wb_stage.io.wb_addr_out
+  id_stage.io.needBlock:=block_judge.io.needBlock
 }
