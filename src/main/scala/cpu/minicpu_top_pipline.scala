@@ -25,7 +25,7 @@ class IF_stage extends Module {
   val io = IO(new Bundle {
     val next_ready = Input(Bool())
     val valid = Output(Bool())
-    val inst_cancel = Input(Bool())
+    val needBlock  = Input(Bool())
     val br_taken = Input(Bool())
     val nextpc = Input(UInt(32.W))
     val inst_sram_rdata = Input(UInt(32.W))
@@ -38,10 +38,11 @@ class IF_stage extends Module {
   val inst_pc = RegInit(0x1bfffffc.U)
   valid:=true.B
   // val inst_pc = RegInit(0x1c000000.U)
-
-  io.valid:=valid
-  io.inst_sram_addr := Mux(io.br_taken,io.nextpc,inst_pc + 4.U)
-  inst_pc:=io.inst_sram_addr 
+  when(~io.needBlock){
+      inst_pc:=io.inst_sram_addr 
+  }
+  io.valid:=valid&&(~io.needBlock)
+  io.inst_sram_addr := Mux(io.needBlock,inst_pc,Mux(io.br_taken,io.nextpc,inst_pc + 4.U))
   io.inst := io.inst_sram_rdata
   io.pc:=inst_pc
 }
@@ -74,21 +75,22 @@ class ID_stage extends Module {
     val rf_raddr1 = Output(UInt(5.W))
     val rf_raddr2 = Output(UInt(5.W))
     val needBlock = Input(Bool())
-    val inst_cancel = Output(Bool())
   })
-  // io.ready := !io.needBlock
-  io.ready:=true.B
+  io.ready := true.B
+  // io.ready:=true.B
   val valid = RegInit(false.B)
-  val inst = Reg(UInt(32.W))
+  val inst = RegInit(UInt(32.W), 0.U)
+  // val inst = RegInit(UInt(32.W), 0.U)
   val pc = Reg(UInt(32.W))
+  val inst_cancel = Wire(Bool())
   when(io.pre_valid&&io.ready){
-    valid := true.B
+    valid := true.B&&(~inst_cancel)
     pc := io.pc_in
     inst:=io.inst
-  }.elsewhen(valid&&io.next_ready){
+  }.elsewhen(valid&&io.next_ready&&(~io.needBlock)){
     valid := false.B
   }
-  io.valid := valid
+  io.valid := valid&&(~io.needBlock)
 
   // val inst = RegInit(UInt(32.W), 0.U)
   // val inst = Reg(UInt(32.W))
@@ -111,18 +113,18 @@ class ID_stage extends Module {
   // 控制信号
   val src_reg_is_rd = inst_frag_decoder.io.cs.src_reg_is_rd //
   val w_addr_is_1 = inst_frag_decoder.io.cs.w_addr_is_1 //
-  io.rf_we_ID := inst_frag_decoder.io.cs.rf_we && io.valid
+  io.rf_we_ID := inst_frag_decoder.io.cs.rf_we 
   val sel_src2 = inst_frag_decoder.io.cs.sel_src2 //
   val src1_is_pc = inst_frag_decoder.io.cs.src1_is_pc //
   io.alu_op := inst_frag_decoder.io.cs.alu_op
-  io.mem_we := inst_frag_decoder.io.cs.mem_we && io.valid
+  io.mem_we := inst_frag_decoder.io.cs.mem_we 
   io.wb_from_mem := inst_frag_decoder.io.cs.wb_from_mem
   val sign_ext_offs26 = inst_frag_decoder.io.cs.sign_ext_offs26 //
   io.br_taken := inst_frag_decoder.io.cs.base_pc_add_offs&&io.valid
   io.base_pc_from_rj := inst_frag_decoder.io.cs.base_pc_from_rj
   io.need_rf_raddr1:=inst_frag_decoder.io.cs.need_rf_raddr1
   io.need_rf_raddr2:=inst_frag_decoder.io.cs.need_rf_raddr2
-  io.inst_cancel:=inst_frag_decoder.io.cs.inst_cancel
+  inst_cancel:=inst_frag_decoder.io.cs.inst_cancel&&io.valid
   // 寄存器堆
   val rf_regfile = Module(new RegFile())
   val rf_waddr = Wire(UInt(5.W))
@@ -344,7 +346,6 @@ class minicpu_top_pipline extends Module {
   pre_if.io.gr_rj := id_stage.io.rf_data1
   pre_if.io.pc := id_stage.io.pc_out
   if_stage.io.br_taken:=id_stage.io.br_taken
-  if_stage.io.inst_cancel:=id_stage.io.inst_cancel
   ////////////////
   // 执行阶段EXE
   ////////////////
@@ -419,5 +420,6 @@ class minicpu_top_pipline extends Module {
   block_judge.io.mem_rf_waddr:=mem_stage.io.wb_addr_out
   block_judge.io.wb_rf_we    :=wb_stage.io.rf_we_out
   block_judge.io.wb_rf_waddr :=wb_stage.io.wb_addr_out
+  if_stage.io.needBlock:=block_judge.io.needBlock
   id_stage.io.needBlock:=block_judge.io.needBlock
 }
