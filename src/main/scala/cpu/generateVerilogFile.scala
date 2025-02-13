@@ -5,12 +5,19 @@ object res extends App {
   // emitVerilog(new minicpu_top_5inst(), Array("--target-dir", "generated"))
   // emitVerilog(new RegFile(), Array("--target-dir", "generated"))
   // emitVerilog(new Inst_Frag_Decoder(), Array("--target-dir", "generated"))
-  // emitVerilog(
-  //   new minicpu_top_pipline(),
-  //   Array("--target-dir", "D:/Code/VScode/cdp_ede_local/mycpu_env/myCPU")
-  // )
+  val local = false
+  if(local){
   emitVerilog(
     new minicpu_top_pipline(),
     Array("--target-dir", "generated")
   )
+  }
+  else{
+    emitVerilog(
+    new minicpu_top_pipline(),
+    Array("--target-dir", "D:/Code/VScode/cdp_ede_local/mycpu_env/myCPU")
+  )
+  }
+
+
 }

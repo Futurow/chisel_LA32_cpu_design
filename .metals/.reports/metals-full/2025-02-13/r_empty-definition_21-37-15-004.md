@@ -1,3 +1,25 @@
+error id: scala/Predef.`???`().
+file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/minicpu_top_pipline.scala
+empty definition using pc, found symbol in pc: scala/Predef.`???`().
+empty definition using semanticdb
+|empty definition using fallback
+non-local guesses:
+	 -chisel3.
+	 -chisel3#
+	 -chisel3().
+	 -chisel3/util.
+	 -chisel3/util#
+	 -chisel3/util().
+	 -.
+	 -#
+	 -().
+	 -scala/Predef.
+	 -scala/Predef#
+	 -scala/Predef().
+
+Document text:
+
+```scala
 import chisel3._
 import chisel3.util._
 class pre_IF extends Module {
@@ -33,15 +55,12 @@ class IF_stage extends Module {
     val inst_sram_addr = Output(UInt(32.W))
     val pc = Output(UInt(32.W))
   })
-  val valid = RegInit(false.B)
+  val valid = RegInit(true.B)
   val ready= true.B
   val inst_pc = RegInit(0x1bfffffc.U)
-  valid:=true.B
-  // val inst_pc = RegInit(0x1c000000.U)
 
-  io.valid:=valid
-  io.inst_sram_addr := Mux(io.br_taken,io.nextpc,inst_pc + 4.U)
-  inst_pc:=io.inst_sram_addr 
+  io.valid:=true.B
+  io.inst_sram_addr := Mux(io.br_taken,io.nextpc,inst_pc+4.U)
   io.inst := io.inst_sram_rdata
   io.pc:=inst_pc
 }
@@ -79,20 +98,15 @@ class ID_stage extends Module {
   // io.ready := !io.needBlock
   io.ready:=true.B
   val valid = RegInit(false.B)
-  val inst = Reg(UInt(32.W))
   val pc = Reg(UInt(32.W))
-  when(io.pre_valid&&io.ready){
-    valid := true.B
-    pc := io.pc_in
-    inst:=io.inst
-  }.elsewhen(valid&&io.next_ready){
-    valid := false.B
-  }
+  valid := io.pre_valid
+  pc := io.pc_in
   io.valid := valid
 
   // val inst = RegInit(UInt(32.W), 0.U)
   // val inst = Reg(UInt(32.W))
   // val pc = RegInit(UInt(32.W), 0x1c000000.U) // 0x1bfffffc
+  val inst = io.inst
   io.pc_out := pc
 
   val inst_op = inst(31, 15)
@@ -189,8 +203,8 @@ class EXE_stage extends Module {
   val wb_from_mem = Reg(Bool())
   val rf_we = Reg(Bool())
   val rf_data2 = Reg(SInt(32.W))
-  when(io.pre_valid&&io.ready){
-    valid := true.B
+  when(io.next_ready&&io.ready){
+    valid := io.pre_valid
     pc := io.pc_in
     wb_addr := io.wb_addr_in
 
@@ -202,10 +216,9 @@ class EXE_stage extends Module {
     wb_from_mem := io.wb_from_mem_in
     rf_we := io.rf_we_in
     rf_data2 := io.rf_data2
-  }.elsewhen(valid&&io.next_ready){
-    valid := false.B
   }
-  io.valid := valid
+
+  io.valid := valid &&io.ready
   io.pc_out := pc 
   io.wb_addr_out := wb_addr
 
@@ -247,17 +260,16 @@ class MEM_stage extends Module {
   val alu_res = Reg(SInt(32.W))
   val rf_we = Reg(Bool())
   val wb_from_mem = Reg(Bool())
-  when(io.pre_valid&&io.ready){
-    valid := true.B
+  when(io.next_ready&&io.ready){
+    valid := io.pre_valid
     pc := io.pc_in
     wb_addr := io.wb_addr_in
     alu_res := io.alu_res
     rf_we := io.rf_we_in
     wb_from_mem := io.wb_from_mem
-  }.elsewhen(valid&&io.next_ready){
-    valid:=false.B
   }
-  io.valid := valid
+
+  io.valid := valid&&io.ready
   io.pc_out := pc
   io.wb_addr_out := wb_addr
   io.rf_we_out := rf_we && valid
@@ -285,16 +297,15 @@ class WB_stage extends Module {
   val wb_data = Reg(SInt(32.W))
   val wb_addr = Reg(UInt(5.W))
   val rf_we = Reg(Bool())
-  when(io.pre_valid&&io.ready){
-    valid := true.B
+  when(io.next_ready&&io.ready){
+    valid := io.pre_valid
     pc := io.pc_in
     wb_data := io.wb_data_in
     wb_addr := io.wb_addr_in
     rf_we := io.rf_we_in
-  }.elsewhen(valid&&io.next_ready){
-    valid:=false.B
   }
-  io.valid := valid
+  
+  io.valid := valid&&io.ready
   io.pc_out := pc
 
   io.wb_data_out := wb_data
@@ -421,3 +432,9 @@ class minicpu_top_pipline extends Module {
   block_judge.io.wb_rf_waddr :=wb_stage.io.wb_addr_out
   id_stage.io.needBlock:=block_judge.io.needBlock
 }
+
+```
+
+#### Short summary: 
+
+empty definition using pc, found symbol in pc: scala/Predef.`???`().

@@ -1,3 +1,16 @@
+file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/minicpu_top_pipline.scala
+### java.lang.IndexOutOfBoundsException: -1
+
+occurred in the presentation compiler.
+
+presentation compiler configuration:
+
+
+action parameters:
+offset: 2824
+uri: file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/minicpu_top_pipline.scala
+text:
+```scala
 import chisel3._
 import chisel3.util._
 class pre_IF extends Module {
@@ -33,13 +46,12 @@ class IF_stage extends Module {
     val inst_sram_addr = Output(UInt(32.W))
     val pc = Output(UInt(32.W))
   })
-  val valid = RegInit(false.B)
+  val valid = RegInit(true.B)
   val ready= true.B
   val inst_pc = RegInit(0x1bfffffc.U)
-  valid:=true.B
   // val inst_pc = RegInit(0x1c000000.U)
 
-  io.valid:=valid
+  io.valid:=true.B
   io.inst_sram_addr := Mux(io.br_taken,io.nextpc,inst_pc + 4.U)
   inst_pc:=io.inst_sram_addr 
   io.inst := io.inst_sram_rdata
@@ -85,8 +97,8 @@ class ID_stage extends Module {
     valid := true.B
     pc := io.pc_in
     inst:=io.inst
-  }.elsewhen(valid&&io.next_ready){
-    valid := false.B
+  }.elsewhen()@@{
+
   }
   io.valid := valid
 
@@ -189,8 +201,7 @@ class EXE_stage extends Module {
   val wb_from_mem = Reg(Bool())
   val rf_we = Reg(Bool())
   val rf_data2 = Reg(SInt(32.W))
-  when(io.pre_valid&&io.ready){
-    valid := true.B
+    valid := io.pre_valid
     pc := io.pc_in
     wb_addr := io.wb_addr_in
 
@@ -202,9 +213,7 @@ class EXE_stage extends Module {
     wb_from_mem := io.wb_from_mem_in
     rf_we := io.rf_we_in
     rf_data2 := io.rf_data2
-  }.elsewhen(valid&&io.next_ready){
-    valid := false.B
-  }
+
   io.valid := valid
   io.pc_out := pc 
   io.wb_addr_out := wb_addr
@@ -247,16 +256,13 @@ class MEM_stage extends Module {
   val alu_res = Reg(SInt(32.W))
   val rf_we = Reg(Bool())
   val wb_from_mem = Reg(Bool())
-  when(io.pre_valid&&io.ready){
-    valid := true.B
+    valid := io.pre_valid
     pc := io.pc_in
     wb_addr := io.wb_addr_in
     alu_res := io.alu_res
     rf_we := io.rf_we_in
     wb_from_mem := io.wb_from_mem
-  }.elsewhen(valid&&io.next_ready){
-    valid:=false.B
-  }
+
   io.valid := valid
   io.pc_out := pc
   io.wb_addr_out := wb_addr
@@ -285,15 +291,12 @@ class WB_stage extends Module {
   val wb_data = Reg(SInt(32.W))
   val wb_addr = Reg(UInt(5.W))
   val rf_we = Reg(Bool())
-  when(io.pre_valid&&io.ready){
-    valid := true.B
+    valid := io.pre_valid
     pc := io.pc_in
     wb_data := io.wb_data_in
     wb_addr := io.wb_addr_in
     rf_we := io.rf_we_in
-  }.elsewhen(valid&&io.next_ready){
-    valid:=false.B
-  }
+  
   io.valid := valid
   io.pc_out := pc
 
@@ -421,3 +424,23 @@ class minicpu_top_pipline extends Module {
   block_judge.io.wb_rf_waddr :=wb_stage.io.wb_addr_out
   id_stage.io.needBlock:=block_judge.io.needBlock
 }
+
+```
+
+
+
+#### Error stacktrace:
+
+```
+scala.collection.LinearSeqOps.apply(LinearSeq.scala:129)
+	scala.collection.LinearSeqOps.apply$(LinearSeq.scala:128)
+	scala.collection.immutable.List.apply(List.scala:79)
+	dotty.tools.dotc.util.Signatures$.applyCallInfo(Signatures.scala:244)
+	dotty.tools.dotc.util.Signatures$.computeSignatureHelp(Signatures.scala:101)
+	dotty.tools.dotc.util.Signatures$.signatureHelp(Signatures.scala:88)
+	dotty.tools.pc.SignatureHelpProvider$.signatureHelp(SignatureHelpProvider.scala:47)
+	dotty.tools.pc.ScalaPresentationCompiler.signatureHelp$$anonfun$1(ScalaPresentationCompiler.scala:422)
+```
+#### Short summary: 
+
+java.lang.IndexOutOfBoundsException: -1
