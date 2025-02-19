@@ -1,3 +1,15 @@
+error id: 
+file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/tool.scala
+empty definition using pc, found symbol in pc: 
+empty definition using semanticdb
+|empty definition using fallback
+non-local guesses:
+	 -Path#
+	 -scala/Predef.Path#
+
+Document text:
+
+```scala
 import chisel3._
 import chisel3.util._
 
@@ -248,75 +260,41 @@ class Block_Judge extends Module{
     val need_rf_raddr1 = Input(Bool())
     val need_rf_raddr2 = Input(Bool())
     val rf_raddr1 = Input(UInt(5.W))
-    val rf_rdata1 = Input(SInt(32.W))
     val rf_raddr2 = Input(UInt(5.W))
-    val rf_rdata2 = Input(SInt(32.W))
-    val exe_wb_from_mem = Input(Bool())
     val exe_rf_we = Input(Bool())
     val exe_rf_waddr = Input(UInt(5.W))
-    val exe_alu_res = Input(SInt(32.W))
     val mem_rf_we = Input(Bool())
     val mem_rf_waddr = Input(UInt(5.W))
-    val mem_wb_data = Input(SInt(32.W))
     val wb_rf_we = Input(Bool())
     val wb_rf_waddr = Input(UInt(5.W))
-    val wb_wb_data = Input(SInt(32.W))
-    val forward_rf_rdata1 =Output(SInt(32.W))
-    val forward_rf_rdata2 =Output(SInt(32.W))
     val needBlock = Output(Bool())
   })
-  val block_rf1 = Wire(Bool())
-  val block_rf2 = Wire(Bool())
+  val W_R_rf_addr1 = Wire(Bool())
+  val W_R_rf_addr2 = Wire(Bool())
   when(io.need_rf_raddr1){
     when(io.rf_raddr1=/=0.U){
-      when(io.exe_rf_we&&(io.rf_raddr1===io.exe_rf_waddr)){
-           when(io.exe_wb_from_mem){
-            block_rf1:=true.B
-            io.forward_rf_rdata1:=io.rf_rdata1
-           }.otherwise{
-            block_rf1:=false.B
-            io.forward_rf_rdata1:=io.exe_alu_res
-           }
-      }.elsewhen(io.mem_rf_we&&(io.rf_raddr1===io.mem_rf_waddr)){
-        block_rf1:=false.B
-        io.forward_rf_rdata1:=io.mem_wb_data
-      }.elsewhen(io.wb_rf_we&&(io.rf_raddr1===io.wb_rf_waddr)){
-        block_rf1:=false.B
-        io.forward_rf_rdata1:=io.wb_wb_data
-      }.otherwise{
-        io.forward_rf_rdata1:=io.rf_rdata1
-        block_rf1:=false.B}
-    }.otherwise{
-      io.forward_rf_rdata1:=io.rf_rdata1
-      block_rf1:=false.B}
-  }.otherwise{
-    io.forward_rf_rdata1:=io.rf_rdata1
-    block_rf1:=false.B}
-
+      when((io.exe_rf_we&&(io.rf_raddr1===io.exe_rf_waddr))||
+           (io.mem_rf_we&&(io.rf_raddr1===io.mem_rf_waddr))||
+           (io.wb_rf_we&&(io.rf_raddr1===io.wb_rf_waddr)))
+           {
+            W_R_rf_addr1:=true.B
+      }.otherwise{W_R_rf_addr1:=false.B}
+    }.otherwise{W_R_rf_addr1:=false.B}
+  }.otherwise{W_R_rf_addr1:=false.B}
   when(io.need_rf_raddr2){
     when(io.rf_raddr2=/=0.U){
-      when(io.exe_rf_we&&(io.rf_raddr2===io.exe_rf_waddr)){
-           when(io.exe_wb_from_mem){
-            block_rf2:=true.B
-            io.forward_rf_rdata2:=io.rf_rdata2
-           }.otherwise{
-            block_rf2:=false.B
-            io.forward_rf_rdata2:=io.exe_alu_res
-           }
-      }.elsewhen(io.mem_rf_we&&(io.rf_raddr2===io.mem_rf_waddr)){
-        block_rf2:=false.B
-        io.forward_rf_rdata2:=io.mem_wb_data
-      }.elsewhen(io.wb_rf_we&&(io.rf_raddr2===io.wb_rf_waddr)){
-        block_rf2:=false.B
-        io.forward_rf_rdata2:=io.wb_wb_data
-      }.otherwise{
-        io.forward_rf_rdata2:=io.rf_rdata2
-        block_rf2:=false.B}
-    }.otherwise{
-      io.forward_rf_rdata2:=io.rf_rdata2
-      block_rf2:=false.B}
-  }.otherwise{
-    io.forward_rf_rdata2:=io.rf_rdata2
-    block_rf2:=false.B}
-  io.needBlock:=block_rf1||block_rf2
+      when((io.exe_rf_we&&(io.rf_raddr2===io.exe_rf_waddr))||
+           (io.mem_rf_we&&(io.rf_raddr2===io.mem_rf_waddr))||
+           (io.wb_rf_we&&(io.rf_raddr2===io.wb_rf_waddr)))
+           {
+            W_R_rf_addr2:=true.B
+      }.otherwise{W_R_rf_addr2:=false.B}
+    }.otherwise{W_R_rf_addr2:=false.B}
+  }.otherwise{W_R_rf_addr2:=false.B}
+  io.needBlock:=W_R_rf_addr1||W_R_rf_addr2
 }
+```
+
+#### Short summary: 
+
+empty definition using pc, found symbol in pc: 

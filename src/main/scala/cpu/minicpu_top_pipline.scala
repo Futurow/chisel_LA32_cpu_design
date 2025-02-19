@@ -54,6 +54,8 @@ class ID_stage extends Module {
     val valid = Output(Bool())
     val inst = Input(UInt(32.W))
     val pc_in = Input(UInt(32.W))
+    val forward_rf_rdata1 =Input(SInt(32.W))
+    val forward_rf_rdata2 = Input(SInt(32.W))
     val rf_we_WB = Input(Bool())
     val wb_data = Input(SInt(32.W))
     val wb_addr_in = Input(UInt(5.W))
@@ -67,6 +69,8 @@ class ID_stage extends Module {
     val pc_offs = Output(SInt(32.W))
     val src1 = Output(SInt(32.W))
     val src2 = Output(SInt(32.W))
+    val to_forward_rf_data1 = Output(SInt(32.W))
+    val to_forward_rf_data2 = Output(SInt(32.W))
     val rf_data1 = Output(SInt(32.W))
     val rf_data2 = Output(SInt(32.W))
     val pc_out = Output(UInt(32.W))
@@ -137,8 +141,10 @@ class ID_stage extends Module {
   rf_regfile.io.waddr := io.wb_addr_in
   rf_regfile.io.wdata := io.wb_data
   rf_regfile.io.we := io.rf_we_WB
-  val gr_rj = rf_regfile.io.rdata1
-  val gr_rdk = rf_regfile.io.rdata2
+  io.to_forward_rf_data1:=rf_regfile.io.rdata1
+  io.to_forward_rf_data2:=rf_regfile.io.rdata2
+  val gr_rj = io.forward_rf_rdata1
+  val gr_rdk = io.forward_rf_rdata2
   rj_eq_rd := (gr_rj === gr_rdk)
   io.rf_data1 := gr_rj
   io.rf_data2 := gr_rdk
@@ -412,14 +418,24 @@ class minicpu_top_pipline extends Module {
   val block_judge = Module(new Block_Judge())
   block_judge.io.need_rf_raddr1:=id_stage.io.need_rf_raddr1
   block_judge.io.need_rf_raddr2:=id_stage.io.need_rf_raddr2
+
   block_judge.io.rf_raddr1:=id_stage.io.rf_raddr1
+  block_judge.io.rf_rdata1:=id_stage.io.to_forward_rf_data1
   block_judge.io.rf_raddr2:=id_stage.io.rf_raddr2
+  block_judge.io.rf_rdata2:=id_stage.io.to_forward_rf_data2
+
+  block_judge.io.exe_wb_from_mem:=exe_stage.io.wb_from_mem_out
   block_judge.io.exe_rf_we   :=exe_stage.io.rf_we_out
   block_judge.io.exe_rf_waddr:=exe_stage.io.wb_addr_out
+  block_judge.io.exe_alu_res:=exe_stage.io.alu_res
   block_judge.io.mem_rf_we   :=mem_stage.io.rf_we_out
   block_judge.io.mem_rf_waddr:=mem_stage.io.wb_addr_out
+  block_judge.io.mem_wb_data:=mem_stage.io.wb_data
   block_judge.io.wb_rf_we    :=wb_stage.io.rf_we_out
   block_judge.io.wb_rf_waddr :=wb_stage.io.wb_addr_out
+  block_judge.io.wb_wb_data:=wb_stage.io.wb_data_out
   if_stage.io.needBlock:=block_judge.io.needBlock
   id_stage.io.needBlock:=block_judge.io.needBlock
+  id_stage.io.forward_rf_rdata1:=block_judge.io.forward_rf_rdata1
+  id_stage.io.forward_rf_rdata2:=block_judge.io.forward_rf_rdata2
 }

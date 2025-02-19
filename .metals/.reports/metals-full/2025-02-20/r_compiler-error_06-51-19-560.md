@@ -1,3 +1,38 @@
+file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/tool.scala
+### java.lang.AssertionError: assertion failed: position error, parent span does not contain child span
+parent      =  extends Bundle {
+  val need_rf_raddr1 = Input(Bool())
+  val need_rf_raddr2 = Input(Bool())
+  val rf_raddr1 = Input(UInt(5.W))
+  val rf_rdata1 = Input(SInt(32.W))
+  val rf_raddr2 = Input(UInt(5.W))
+  val rf_rdata2 = Input(SInt(32.W))
+  val exe_wb_from_mem = Input(Bool())
+  val exe_rf_we = Input(Bool())
+  val exe_rf_waddr = Input(UInt(5.W))
+  val exe_alu_res = Input(SInt(32.W))
+  val mem_rf_we = Input(Bool())
+  val mem_rf_waddr = Input(UInt(5.W))
+  val mem_wb_data = Input(SInt(32.W))
+  val wb_rf_we = Input(Bool())
+  val wb_rf_waddr = Input(UInt(5.W))
+  val wb_wb_data = Input(SInt(32.W))
+  val rf_data1 = Output(_root_.scala.Predef.???)
+} # -1,
+parent span = <10975..13071>,
+child       = val rf_data1 = Output(_root_.scala.Predef.???) # -1,
+child span  = [11599..11603..13591]
+
+occurred in the presentation compiler.
+
+presentation compiler configuration:
+
+
+action parameters:
+offset: 11583
+uri: file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/tool.scala
+text:
+```scala
 import chisel3._
 import chisel3.util._
 
@@ -260,63 +295,152 @@ class Block_Judge extends Module{
     val mem_wb_data = Input(SInt(32.W))
     val wb_rf_we = Input(Bool())
     val wb_rf_waddr = Input(UInt(5.W))
-    val wb_wb_data = Input(SInt(32.W))
-    val forward_rf_rdata1 =Output(SInt(32.W))
-    val forward_rf_rdata2 =Output(SInt(32.W))
+    val wb_wb_data = Input(@@SInt(32.W))
+    val rf_data1 =Output(
+    val rf_data2 =Output(
     val needBlock = Output(Bool())
   })
-  val block_rf1 = Wire(Bool())
-  val block_rf2 = Wire(Bool())
+  val W_R_rf_addr1 = Wire(Bool())
+  val W_R_rf_addr2 = Wire(Bool())
   when(io.need_rf_raddr1){
     when(io.rf_raddr1=/=0.U){
-      when(io.exe_rf_we&&(io.rf_raddr1===io.exe_rf_waddr)){
-           when(io.exe_wb_from_mem){
-            block_rf1:=true.B
-            io.forward_rf_rdata1:=io.rf_rdata1
-           }.otherwise{
-            block_rf1:=false.B
-            io.forward_rf_rdata1:=io.exe_alu_res
-           }
-      }.elsewhen(io.mem_rf_we&&(io.rf_raddr1===io.mem_rf_waddr)){
-        block_rf1:=false.B
-        io.forward_rf_rdata1:=io.mem_wb_data
-      }.elsewhen(io.wb_rf_we&&(io.rf_raddr1===io.wb_rf_waddr)){
-        block_rf1:=false.B
-        io.forward_rf_rdata1:=io.wb_wb_data
-      }.otherwise{
-        io.forward_rf_rdata1:=io.rf_rdata1
-        block_rf1:=false.B}
-    }.otherwise{
-      io.forward_rf_rdata1:=io.rf_rdata1
-      block_rf1:=false.B}
-  }.otherwise{
-    io.forward_rf_rdata1:=io.rf_rdata1
-    block_rf1:=false.B}
-
-  when(io.need_rf_raddr2){
-    when(io.rf_raddr2=/=0.U){
-      when(io.exe_rf_we&&(io.rf_raddr2===io.exe_rf_waddr)){
-           when(io.exe_wb_from_mem){
-            block_rf2:=true.B
-            io.forward_rf_rdata2:=io.rf_rdata2
-           }.otherwise{
-            block_rf2:=false.B
-            io.forward_rf_rdata2:=io.exe_alu_res
-           }
-      }.elsewhen(io.mem_rf_we&&(io.rf_raddr2===io.mem_rf_waddr)){
-        block_rf2:=false.B
-        io.forward_rf_rdata2:=io.mem_wb_data
-      }.elsewhen(io.wb_rf_we&&(io.rf_raddr2===io.wb_rf_waddr)){
-        block_rf2:=false.B
-        io.forward_rf_rdata2:=io.wb_wb_data
-      }.otherwise{
-        io.forward_rf_rdata2:=io.rf_rdata2
-        block_rf2:=false.B}
-    }.otherwise{
-      io.forward_rf_rdata2:=io.rf_rdata2
-      block_rf2:=false.B}
-  }.otherwise{
-    io.forward_rf_rdata2:=io.rf_rdata2
-    block_rf2:=false.B}
-  io.needBlock:=block_rf1||block_rf2
+      when((io.exe_rf_we&&(io.rf_raddr1===io.exe_rf_waddr))||
+           (io.mem_rf_we&&(io.rf_raddr1===io.mem_rf_waddr))||
+           (io.wb_rf_we&&(io.rf_raddr1===io.wb_rf_waddr)))
+           {
+            W_R_rf_addr1:=true.B
+      }.otherwise{W_R_rf_addr1:=false.B}
+    }.otherwise{W_R_rf_addr1:=false.B}
+  }.otherwise{W_R_rf_addr1:=false.B}
+  // when(io.need_rf_raddr1){
+  //   when(io.rf_raddr1=/=0.U){
+  //     when((io.exe_rf_we&&(io.rf_raddr1===io.exe_rf_waddr))||
+  //          (io.mem_rf_we&&(io.rf_raddr1===io.mem_rf_waddr))||
+  //          (io.wb_rf_we&&(io.rf_raddr1===io.wb_rf_waddr)))
+  //          {
+  //           W_R_rf_addr1:=true.B
+  //     }.otherwise{W_R_rf_addr1:=false.B}
+  //   }.otherwise{W_R_rf_addr1:=false.B}
+  // }.otherwise{W_R_rf_addr1:=false.B}
+  // when(io.need_rf_raddr2){
+  //   when(io.rf_raddr2=/=0.U){
+  //     when((io.exe_rf_we&&(io.rf_raddr2===io.exe_rf_waddr))||
+  //          (io.mem_rf_we&&(io.rf_raddr2===io.mem_rf_waddr))||
+  //          (io.wb_rf_we&&(io.rf_raddr2===io.wb_rf_waddr)))
+  //          {
+  //           W_R_rf_addr2:=true.B
+  //     }.otherwise{W_R_rf_addr2:=false.B}
+  //   }.otherwise{W_R_rf_addr2:=false.B}
+  // }.otherwise{W_R_rf_addr2:=false.B}
+  // io.needBlock:=W_R_rf_addr1||W_R_rf_addr2
 }
+// class ForwardPath extends Module{
+//   val io = IO(new Bundle {
+//     val need_rf_raddr1 = Input(Bool())
+//     val need_rf_raddr2 = Input(Bool())
+//     val rf_raddr1 = Input(UInt(5.W))
+//     val rf_raddr2 = Input(UInt(5.W))
+//     val exe_rf_we = Input(Bool())
+//     val exe_rf_waddr = Input(UInt(5.W))
+//     val mem_rf_we = Input(Bool())
+//     val mem_rf_waddr = Input(UInt(5.W))
+//     val wb_rf_we = Input(Bool())
+//     val wb_rf_waddr = Input(UInt(5.W))
+//     val needBlock = Output(Bool())
+//   })
+// }
+```
+
+
+
+#### Error stacktrace:
+
+```
+scala.runtime.Scala3RunTime$.assertFailed(Scala3RunTime.scala:8)
+	dotty.tools.dotc.ast.Positioned.check$1(Positioned.scala:175)
+	dotty.tools.dotc.ast.Positioned.check$1$$anonfun$3(Positioned.scala:205)
+	scala.runtime.function.JProcedure1.apply(JProcedure1.java:15)
+	scala.runtime.function.JProcedure1.apply(JProcedure1.java:10)
+	scala.collection.immutable.List.foreach(List.scala:334)
+	dotty.tools.dotc.ast.Positioned.check$1(Positioned.scala:205)
+	dotty.tools.dotc.ast.Positioned.checkPos(Positioned.scala:226)
+	dotty.tools.dotc.ast.Positioned.check$1(Positioned.scala:200)
+	dotty.tools.dotc.ast.Positioned.checkPos(Positioned.scala:226)
+	dotty.tools.dotc.ast.Positioned.check$1(Positioned.scala:200)
+	dotty.tools.dotc.ast.Positioned.check$1$$anonfun$3(Positioned.scala:205)
+	scala.runtime.function.JProcedure1.apply(JProcedure1.java:15)
+	scala.runtime.function.JProcedure1.apply(JProcedure1.java:10)
+	scala.collection.immutable.List.foreach(List.scala:334)
+	dotty.tools.dotc.ast.Positioned.check$1(Positioned.scala:205)
+	dotty.tools.dotc.ast.Positioned.checkPos(Positioned.scala:226)
+	dotty.tools.dotc.ast.Positioned.check$1(Positioned.scala:200)
+	dotty.tools.dotc.ast.Positioned.checkPos(Positioned.scala:226)
+	dotty.tools.dotc.ast.Positioned.check$1(Positioned.scala:200)
+	dotty.tools.dotc.ast.Positioned.check$1$$anonfun$3(Positioned.scala:205)
+	scala.runtime.function.JProcedure1.apply(JProcedure1.java:15)
+	scala.runtime.function.JProcedure1.apply(JProcedure1.java:10)
+	scala.collection.immutable.List.foreach(List.scala:334)
+	dotty.tools.dotc.ast.Positioned.check$1(Positioned.scala:205)
+	dotty.tools.dotc.ast.Positioned.checkPos(Positioned.scala:226)
+	dotty.tools.dotc.ast.Positioned.check$1(Positioned.scala:200)
+	dotty.tools.dotc.ast.Positioned.checkPos(Positioned.scala:226)
+	dotty.tools.dotc.ast.Positioned.check$1(Positioned.scala:200)
+	dotty.tools.dotc.ast.Positioned.check$1$$anonfun$3(Positioned.scala:205)
+	scala.runtime.function.JProcedure1.apply(JProcedure1.java:15)
+	scala.runtime.function.JProcedure1.apply(JProcedure1.java:10)
+	scala.collection.immutable.List.foreach(List.scala:334)
+	dotty.tools.dotc.ast.Positioned.check$1(Positioned.scala:205)
+	dotty.tools.dotc.ast.Positioned.checkPos(Positioned.scala:226)
+	dotty.tools.dotc.parsing.Parser.parse$$anonfun$1(ParserPhase.scala:39)
+	scala.runtime.function.JProcedure1.apply(JProcedure1.java:15)
+	scala.runtime.function.JProcedure1.apply(JProcedure1.java:10)
+	dotty.tools.dotc.core.Phases$Phase.monitor(Phases.scala:458)
+	dotty.tools.dotc.parsing.Parser.parse(ParserPhase.scala:40)
+	dotty.tools.dotc.parsing.Parser.$anonfun$2(ParserPhase.scala:52)
+	scala.collection.Iterator$$anon$6.hasNext(Iterator.scala:479)
+	scala.collection.Iterator$$anon$9.hasNext(Iterator.scala:583)
+	scala.collection.immutable.List.prependedAll(List.scala:152)
+	scala.collection.immutable.List$.from(List.scala:685)
+	scala.collection.immutable.List$.from(List.scala:682)
+	scala.collection.IterableOps$WithFilter.map(Iterable.scala:900)
+	dotty.tools.dotc.parsing.Parser.runOn(ParserPhase.scala:51)
+	dotty.tools.dotc.Run.runPhases$1$$anonfun$1(Run.scala:315)
+	scala.runtime.function.JProcedure1.apply(JProcedure1.java:15)
+	scala.runtime.function.JProcedure1.apply(JProcedure1.java:10)
+	scala.collection.ArrayOps$.foreach$extension(ArrayOps.scala:1323)
+	dotty.tools.dotc.Run.runPhases$1(Run.scala:308)
+	dotty.tools.dotc.Run.compileUnits$$anonfun$1(Run.scala:349)
+	dotty.tools.dotc.Run.compileUnits$$anonfun$adapted$1(Run.scala:358)
+	dotty.tools.dotc.util.Stats$.maybeMonitored(Stats.scala:69)
+	dotty.tools.dotc.Run.compileUnits(Run.scala:358)
+	dotty.tools.dotc.Run.compileSources(Run.scala:261)
+	dotty.tools.dotc.interactive.InteractiveDriver.run(InteractiveDriver.scala:161)
+	dotty.tools.pc.MetalsDriver.run(MetalsDriver.scala:45)
+	dotty.tools.pc.HoverProvider$.hover(HoverProvider.scala:40)
+	dotty.tools.pc.ScalaPresentationCompiler.hover$$anonfun$1(ScalaPresentationCompiler.scala:376)
+```
+#### Short summary: 
+
+java.lang.AssertionError: assertion failed: position error, parent span does not contain child span
+parent      =  extends Bundle {
+  val need_rf_raddr1 = Input(Bool())
+  val need_rf_raddr2 = Input(Bool())
+  val rf_raddr1 = Input(UInt(5.W))
+  val rf_rdata1 = Input(SInt(32.W))
+  val rf_raddr2 = Input(UInt(5.W))
+  val rf_rdata2 = Input(SInt(32.W))
+  val exe_wb_from_mem = Input(Bool())
+  val exe_rf_we = Input(Bool())
+  val exe_rf_waddr = Input(UInt(5.W))
+  val exe_alu_res = Input(SInt(32.W))
+  val mem_rf_we = Input(Bool())
+  val mem_rf_waddr = Input(UInt(5.W))
+  val mem_wb_data = Input(SInt(32.W))
+  val wb_rf_we = Input(Bool())
+  val wb_rf_waddr = Input(UInt(5.W))
+  val wb_wb_data = Input(SInt(32.W))
+  val rf_data1 = Output(_root_.scala.Predef.???)
+} # -1,
+parent span = <10975..13071>,
+child       = val rf_data1 = Output(_root_.scala.Predef.???) # -1,
+child span  = [11599..11603..13591]
