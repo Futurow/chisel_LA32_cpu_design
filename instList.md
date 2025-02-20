@@ -19,6 +19,9 @@ cpu实现的指令集合
  lu12i.w rd, si20
  slti    rd, rj, si12
  sltui   rd, rj, si12
+ mul.w   rd, rj, rk
+ mulh.w  rd, rj, rk
+ mulh.wu rd, rj, rk
 ```
 ### 移位运算类指令
 ```

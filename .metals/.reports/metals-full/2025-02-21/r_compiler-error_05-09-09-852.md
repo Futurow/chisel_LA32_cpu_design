@@ -1,3 +1,16 @@
+file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/tool.scala
+### java.lang.IndexOutOfBoundsException: -1
+
+occurred in the presentation compiler.
+
+presentation compiler configuration:
+
+
+action parameters:
+offset: 12556
+uri: file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/tool.scala
+text:
+```scala
 import chisel3._
 import chisel3.util._
 
@@ -96,7 +109,6 @@ class Inst_Frag_Decoder_pipline extends Module {
     val sel_src2          = Output(UInt(5.W))    
     val src1_is_pc        = Output(Bool())      
     val alu_op            = Output(UInt(13.W)) 
-    val mul_op            = Output(UInt(2.W)) 
     val mem_we            = Output(Bool()) 
     val wb_from_mem       = Output(Bool()) 
     val sign_ext_offs26   = Output(Bool()) 
@@ -191,7 +203,6 @@ class Inst_Frag_Decoder_pipline extends Module {
   val alu_op_sll  =inst_slli_w|inst_sll_w
   val alu_op_srl  =inst_srli_w|inst_srl_w
   val alu_op_sra  =inst_srai_w|inst_sra_w
-  io.cs.mul_op :=Cat(mul_h,mul_sign)
   io.cs.alu_op := Cat(alu_add,inst_sub_w,sign_less,unsign_less,
                     inst_nor,alu_op_and,alu_op_or,alu_op_xor,inst_lu12i_w,
                     alu_op_sll,alu_op_srl,alu_op_sra,alu_mul)
@@ -238,7 +249,6 @@ class ALU extends Module {
 //                     inst_slli_w,inst_srli_w,inst_srai_w)
   val io = IO(new Bundle {
     val alu_op = Input(UInt(13.W))
-    val mul_op = Input(UInt(2.W))
     val src1 = Input(SInt(32.W))
     val src2 = Input(SInt(32.W))
     val alu_res = Output(SInt(32.W))
@@ -257,16 +267,12 @@ class ALU extends Module {
   val slli_w = io.src1 << ui5
   val srli_w = (io.src1.asUInt >> ui5).asSInt
   val srai_w = io.src1 >> ui5
-  // io.cs.mul_op :=Cat(mul_h,mul_sign)
-  val mul_64_sign   = io.src1*io.src2
-  val mul_64_unsign = (io.src1.asUInt)*(io.src2.asUInt)
-  val mul_64 = Mux(io.mul_op(0),mul_64_sign,mul_64_unsign.asSInt)//mul_sign有无符号乘法
-  val mul_res = Mux(io.mul_op(1),mul_64(63,32).asSInt,mul_64(31,0).asSInt)//mul_h乘法高部还是低部
+  val mul_64 = io.src1*io.src2
+  val mul_res = mul_64(31,@@)
   io.mem_addr := add_w_res.asUInt
   io.alu_res := Mux1H(
     io.alu_op,
     Seq(
-      mul_res,
       srai_w,
       srli_w,
       slli_w,
@@ -359,3 +365,22 @@ class Block_Judge extends Module{
     block_rf2:=false.B}
   io.needBlock:=block_rf1||block_rf2
 }
+```
+
+
+
+#### Error stacktrace:
+
+```
+scala.collection.LinearSeqOps.apply(LinearSeq.scala:129)
+	scala.collection.LinearSeqOps.apply$(LinearSeq.scala:128)
+	scala.collection.immutable.List.apply(List.scala:79)
+	dotty.tools.dotc.util.Signatures$.applyCallInfo(Signatures.scala:244)
+	dotty.tools.dotc.util.Signatures$.computeSignatureHelp(Signatures.scala:101)
+	dotty.tools.dotc.util.Signatures$.signatureHelp(Signatures.scala:88)
+	dotty.tools.pc.SignatureHelpProvider$.signatureHelp(SignatureHelpProvider.scala:47)
+	dotty.tools.pc.ScalaPresentationCompiler.signatureHelp$$anonfun$1(ScalaPresentationCompiler.scala:422)
+```
+#### Short summary: 
+
+java.lang.IndexOutOfBoundsException: -1
