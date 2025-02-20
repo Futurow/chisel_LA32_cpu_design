@@ -62,6 +62,7 @@ class ID_stage extends Module {
     val wb_addr_out = Output(UInt(5.W))
     val rf_we_ID = Output(Bool())
     val alu_op = Output(UInt(12.W))
+    val mul_op = Output(UInt(2.W))
     val mem_we = Output(Bool())
     val wb_from_mem = Output(Bool())
     val br_taken = Output(Bool())
@@ -122,6 +123,7 @@ class ID_stage extends Module {
   val sel_src2 = inst_frag_decoder.io.cs.sel_src2 //
   val src1_is_pc = inst_frag_decoder.io.cs.src1_is_pc //
   io.alu_op := inst_frag_decoder.io.cs.alu_op
+  io.mul_op := inst_frag_decoder.io.cs.mul_op
   io.mem_we := inst_frag_decoder.io.cs.mem_we 
   io.wb_from_mem := inst_frag_decoder.io.cs.wb_from_mem
   val sign_ext_offs26 = inst_frag_decoder.io.cs.sign_ext_offs26 //
@@ -173,6 +175,7 @@ class EXE_stage extends Module {
     val src2 = Input(SInt(32.W))
     val rf_data2 = Input(SInt(32.W))
     val alu_op = Input(UInt(12.W))
+    val mul_op = Input(UInt(2.W))
     val mem_we_in = Input(Bool())
     val mem_we_out = Output(Bool())
     val wb_from_mem_in = Input(Bool())
@@ -194,6 +197,7 @@ class EXE_stage extends Module {
   val src1 = Reg(SInt(32.W))
   val src2 = Reg(SInt(32.W))
   val alu_op = Reg(UInt(12.W))
+  val mul_op = Reg(UInt(2.W))
 
   val mem_we = Reg(Bool())
   val wb_from_mem = Reg(Bool())
@@ -205,6 +209,7 @@ class EXE_stage extends Module {
     wb_addr := io.wb_addr_in
 
     alu_op := io.alu_op
+    mul_op :=io.mul_op
     src1 := io.src1
     src2 := io.src2
 
@@ -226,6 +231,7 @@ class EXE_stage extends Module {
 
   val alu = Module(new ALU())
   alu.io.alu_op := alu_op
+  alu.io.mul_op:=mul_op
   alu.io.src1 := src1
   alu.io.src2 := src2
   io.alu_res := alu.io.alu_res
@@ -363,6 +369,7 @@ class minicpu_top_pipline extends Module {
   exe_stage.io.src2 := id_stage.io.src2
   exe_stage.io.rf_data2 := id_stage.io.rf_data2
   exe_stage.io.alu_op := id_stage.io.alu_op
+  exe_stage.io.mul_op := id_stage.io.mul_op
   exe_stage.io.mem_we_in := id_stage.io.mem_we
   exe_stage.io.wb_from_mem_in := id_stage.io.wb_from_mem
   exe_stage.io.rf_we_in := id_stage.io.rf_we_ID
