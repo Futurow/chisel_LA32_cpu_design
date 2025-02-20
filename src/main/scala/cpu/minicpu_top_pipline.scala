@@ -106,6 +106,7 @@ class ID_stage extends Module {
   val rk = inst(14, 10)
   val rd = inst(4, 0)
   val si12 = inst(21, 10)
+  val ui12 = inst(21, 10)
   val si20 = inst(24, 5)
   val offs16 = inst(25, 10)
   val offs26 = Cat(inst(9, 0), inst(25, 10))
@@ -151,9 +152,10 @@ class ID_stage extends Module {
   // 立即数扩展
   val si20_lu12i = Cat(si20, 0.U(12.W)).asSInt
   val si12_sext = si12.asSInt
+  val ui12_zext = Cat(0.U(20.W),ui12).asSInt
   io.src1 := Mux(src1_is_pc, pc.asSInt, gr_rj)
-  // sel_src2=Cat(src2_is_R_data2,src2_is_si12,src2_is_si20,src2_is_4)
-  io.src2 := Mux1H(sel_src2, Seq(4.S(32.W), si20_lu12i, si12_sext, gr_rdk))
+  //io.cs.sel_src2 := Cat(src2_is_R_data2,src2_is_ui12,src2_is_si12,src2_is_si20,src2_is_4)
+  io.src2 := Mux1H(sel_src2, Seq(4.S(32.W), si20_lu12i, si12_sext,ui12_zext, gr_rdk))
   // pc偏移值offs扩展
   io.pc_offs := Mux(
     sign_ext_offs26,
