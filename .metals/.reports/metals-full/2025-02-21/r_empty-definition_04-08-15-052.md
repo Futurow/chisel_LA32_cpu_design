@@ -1,3 +1,14 @@
+error id: _root_/
+file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/tool.scala
+empty definition using pc, found symbol in pc: _root_/
+semanticdb not found
+|empty definition using fallback
+non-local guesses:
+	 -
+
+Document text:
+
+```scala
 import chisel3._
 import chisel3.util._
 
@@ -174,16 +185,13 @@ class Inst_Frag_Decoder_pipline extends Module {
   // ALU_OP独热码生成
   val alu_add = inst_add_w|inst_addi_w|inst_jirl|inst_bl
   val sign_less = inst_slt|inst_slti
-  val unsign_less = inst_sltu |inst_sltui
-  val alu_op_and  = inst_and  |inst_andi
-  val alu_op_or   = inst_or   |inst_ori
-  val alu_op_xor  = inst_xor  |inst_ori
-  val alu_op_sll  =inst_slli_w|inst_sll_w
-  val alu_op_srl  =inst_srli_w|inst_srl_w
-  val alu_op_sra  =inst_srai_w|inst_sra_w
+  val unsign_less = inst_sltu|inst_sltui
+  val alu_op_and  = inst_and|inst_andi
+  val alu_op_or   = inst_or|inst_ori
+  val alu_op_xor  = inst_xor|inst_ori
   io.cs.alu_op := Cat( alu_add,inst_sub_w,sign_less,unsign_less,
                     inst_nor,alu_op_and,alu_op_or,alu_op_xor,inst_lu12i_w,
-                    alu_op_sll,alu_op_srl,alu_op_sra)
+                    inst_slli_w,inst_srli_w,inst_srai_w)
   io.cs.mem_we := inst_st_w
   io.cs.wb_from_mem := inst_ld_w
   io.cs.sign_ext_offs26 := inst_b|inst_bl
@@ -341,3 +349,8 @@ class Block_Judge extends Module{
     block_rf2:=false.B}
   io.needBlock:=block_rf1||block_rf2
 }
+```
+
+#### Short summary: 
+
+empty definition using pc, found symbol in pc: _root_/
