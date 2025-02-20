@@ -128,6 +128,7 @@ class Inst_Frag_Decoder_pipline extends Module {
   val inst_slt    = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_0100)
   val inst_sltu   = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_0101)
   val inst_nor    = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_1000)
+  val inst_pcaddu12i = op_31_26_d(0b00_0111) & (!io.op(10))
   val inst_and    = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_1001)
   val inst_or     = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_1010)
   val inst_xor    = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_1011)
@@ -161,18 +162,18 @@ class Inst_Frag_Decoder_pipline extends Module {
   io.cs.w_addr_is_1 := inst_bl
   // io.cs.rf_we := !(inst_b | inst_beq | inst_bne | inst_st_w)
   io.cs.rf_we:=inst_add_w|inst_sub_w |inst_slt |inst_sltu |inst_nor |inst_and |inst_or |inst_xor |
-               inst_addi_w |inst_lu12i_w |inst_slli_w |inst_srli_w |inst_srai_w |inst_sll_w|inst_srl_w|inst_sra_w|
+               inst_addi_w|inst_pcaddu12i |inst_lu12i_w |inst_slli_w |inst_srli_w |inst_srai_w |inst_sll_w|inst_srl_w|inst_sra_w|
                inst_jirl |inst_bl |inst_ld_w |inst_slti|inst_sltui|inst_andi|inst_ori|inst_xori
   // sel_src2独热码生成
   val src2_is_R_data2 = inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_nor|inst_and|inst_or|inst_xor|inst_sll_w|inst_srl_w|inst_sra_w
   val src2_is_ui12 = inst_andi|inst_ori|inst_xori
   val src2_is_si12 = inst_addi_w|inst_ld_w|inst_st_w|inst_slli_w|inst_srli_w|inst_srai_w|inst_slti|inst_sltui
-  val src2_is_si20 = inst_lu12i_w
+  val src2_is_si20 = inst_lu12i_w|inst_pcaddu12i
   val src2_is_4 = inst_jirl|inst_bl
   io.cs.sel_src2 := Cat(src2_is_R_data2,src2_is_ui12,src2_is_si12,src2_is_si20,src2_is_4)
-  io.cs.src1_is_pc := inst_jirl|inst_bl
+  io.cs.src1_is_pc := inst_jirl|inst_bl|inst_pcaddu12i
   // ALU_OP独热码生成
-  val alu_add = inst_add_w|inst_addi_w|inst_jirl|inst_bl
+  val alu_add = inst_add_w|inst_addi_w|inst_jirl|inst_bl|inst_pcaddu12i
   val sign_less = inst_slt|inst_slti
   val unsign_less = inst_sltu |inst_sltui
   val alu_op_and  = inst_and  |inst_andi

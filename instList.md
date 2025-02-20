@@ -8,6 +8,7 @@ cpu实现的指令集合
  addi.w  rd, rj, si12
  slt     rd, rj, rk
  sltu    rd, rj, rk
+ pcaddu12i   rd, si20
  and     rd, rj, rk
  or      rd, rj, rk
  nor     rd, rj, rk
@@ -24,7 +25,7 @@ cpu实现的指令集合
  sll.w   rd, rj, rk
  srl.w   rd, rj, rk
  sra.w   rd, rj, rk
- 
+
  slli.w  rd, rj, ui5
  srli.w  rd, rj, ui5
  srai.w  rd, rj, ui5
