@@ -162,7 +162,7 @@ class Inst_Frag_Decoder_pipline extends Module {
 
   val inst_ld_w = op_31_26_d(0b00_1010) & op_25_22_d(0b0010)
   val inst_st_w = op_31_26_d(0b00_1010) & op_25_22_d(0b0110)
-  // 控制信号生成
+  // 控制信号生成(新指令需要判断rf1和rf2的读取情况)
   io.cs.src_reg_is_rd := inst_beq | inst_bne | inst_st_w
   io.cs.w_addr_is_1 := inst_bl
   // io.cs.rf_we := !(inst_b | inst_beq | inst_bne | inst_st_w)
@@ -187,7 +187,7 @@ class Inst_Frag_Decoder_pipline extends Module {
   val unsign_less = inst_sltu |inst_sltui
   val alu_op_and  = inst_and  |inst_andi
   val alu_op_or   = inst_or   |inst_ori
-  val alu_op_xor  = inst_xor  |inst_ori
+  val alu_op_xor  = inst_xor  |inst_xori
   val alu_op_sll  =inst_slli_w|inst_sll_w
   val alu_op_srl  =inst_srli_w|inst_srl_w
   val alu_op_sra  =inst_srai_w|inst_sra_w
@@ -200,12 +200,16 @@ class Inst_Frag_Decoder_pipline extends Module {
   io.cs.sign_ext_offs26 := inst_b|inst_bl
   io.cs.base_pc_add_offs := inst_jirl|inst_b|inst_bl|(inst_beq&&io.rj_eq_rd)|(inst_bne&&(!io.rj_eq_rd))
   io.cs.base_pc_from_rj := inst_jirl
-   
+  
   io.cs.need_rf_raddr1:=inst_add_w|inst_sub_w|inst_addi_w|inst_slt|inst_sltu|inst_and|inst_or|inst_nor|inst_xor|
-                        inst_slli_w|inst_srli_w|inst_srai_w|inst_beq|inst_bne|inst_jirl|inst_st_w|inst_ld_w
+                        inst_slli_w|inst_srli_w|inst_srai_w|inst_beq|inst_bne|inst_jirl|inst_st_w|inst_ld_w|
+                        inst_slti|inst_sltui|inst_andi|inst_ori|inst_xori|inst_sll_w|inst_srl_w|inst_sra_w|
+                        inst_mul_w|inst_mulh_w|inst_mulh_wu
 
   io.cs.need_rf_raddr2:=inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_and|inst_or|inst_nor|inst_xor|
-                        inst_beq|inst_bne|inst_st_w
+                        inst_beq|inst_bne|inst_st_w|inst_sll_w|inst_srl_w|inst_sra_w|
+                        inst_mul_w|inst_mulh_w|inst_mulh_wu
+
   io.cs.inst_cancel:=inst_jirl|inst_b|inst_bl|(inst_beq&&io.rj_eq_rd)|(inst_bne&&(!io.rj_eq_rd))
 
 }
@@ -233,9 +237,6 @@ class RegFile extends Module {
   io.rdata2 := Mux(io.raddr2 === 0.U, 0.S, reg(io.raddr2))
 }
 class ALU extends Module {
-// val alu_op = Cat( alu_add,inst_sub_w,inst_slt,inst_sltu,
-//                     inst_nor,inst_and,inst_or,inst_xor,inst_lu12i_w,
-//                     inst_slli_w,inst_srli_w,inst_srai_w)
   val io = IO(new Bundle {
     val alu_op = Input(UInt(13.W))
     val mul_op = Input(UInt(2.W))
