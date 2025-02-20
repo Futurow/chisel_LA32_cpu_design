@@ -1,3 +1,16 @@
+file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/tool.scala
+### java.lang.IndexOutOfBoundsException: -1
+
+occurred in the presentation compiler.
+
+presentation compiler configuration:
+
+
+action parameters:
+offset: 6632
+uri: file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/tool.scala
+text:
+```scala
 import chisel3._
 import chisel3.util._
 
@@ -133,8 +146,8 @@ class Inst_Frag_Decoder_pipline extends Module {
   val inst_xor    = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_1011)
   val inst_addi_w = op_31_26_d(0b00_0000) & op_25_22_d(0b1010)
   val inst_lu12i_w= op_31_26_d(0b00_0101) & (!io.op(10))
-  val inst_slti   = op_31_26_d(0b00_0000) & op_25_22_d(0b1000)
-  val inst_sltui  = op_31_26_d(0b00_0000) & op_25_22_d(0b1001)
+  val inst_slti   = op_31_26_d(@@)
+  val inst_sltui  = op_31_26_d()
 
   val inst_slli_w = op_31_26_d(0b00_0000) & op_25_22_d(0b0001) & op_21_20_d(0b00) & op_19_15_d(0b0_0001)
   val inst_srli_w = op_31_26_d(0b00_0000) & op_25_22_d(0b0001) & op_21_20_d(0b00) & op_19_15_d(0b0_1001)
@@ -152,19 +165,17 @@ class Inst_Frag_Decoder_pipline extends Module {
   io.cs.src_reg_is_rd := inst_beq | inst_bne | inst_st_w
   io.cs.w_addr_is_1 := inst_bl
   // io.cs.rf_we := !(inst_b | inst_beq | inst_bne | inst_st_w)
-  io.cs.rf_we:=inst_add_w|inst_sub_w |inst_slt |inst_sltu |inst_nor |inst_and |inst_or |inst_xor |inst_addi_w |inst_lu12i_w |inst_slli_w |inst_srli_w |inst_srai_w |inst_jirl |inst_bl |inst_ld_w |inst_slti|inst_sltui
+  io.cs.rf_we:=inst_add_w|inst_sub_w |inst_slt |inst_sltu |inst_nor |inst_and |inst_or |inst_xor |inst_addi_w |inst_lu12i_w |inst_slli_w |inst_srli_w |inst_srai_w |inst_jirl |inst_bl |inst_ld_w 
   // sel_src2独热码生成
   val src2_is_R_data2 = inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_nor|inst_and|inst_or|inst_xor
-  val src2_is_si12 = inst_addi_w|inst_ld_w|inst_st_w|inst_slli_w|inst_srli_w|inst_srai_w|inst_slti|inst_sltui
+  val src2_is_si12 = inst_addi_w|inst_ld_w|inst_st_w|inst_slli_w|inst_srli_w|inst_srai_w
   val src2_is_si20 = inst_lu12i_w
   val src2_is_4 = inst_jirl|inst_bl
   io.cs.sel_src2 := Cat(src2_is_R_data2,src2_is_si12,src2_is_si20,src2_is_4)
   io.cs.src1_is_pc := inst_jirl|inst_bl
   // ALU_OP独热码生成
   val alu_add = inst_add_w|inst_addi_w|inst_jirl|inst_bl
-  val sign_less = inst_slt|inst_slti
-  val unsign_less = inst_sltu|inst_sltui
-  io.cs.alu_op := Cat( alu_add,inst_sub_w,sign_less,unsign_less,
+  io.cs.alu_op := Cat( alu_add,inst_sub_w,inst_slt,inst_sltu,
                     inst_nor,inst_and,inst_or,inst_xor,inst_lu12i_w,
                     inst_slli_w,inst_srli_w,inst_srai_w)
   io.cs.mem_we := inst_st_w
@@ -324,3 +335,22 @@ class Block_Judge extends Module{
     block_rf2:=false.B}
   io.needBlock:=block_rf1||block_rf2
 }
+```
+
+
+
+#### Error stacktrace:
+
+```
+scala.collection.LinearSeqOps.apply(LinearSeq.scala:129)
+	scala.collection.LinearSeqOps.apply$(LinearSeq.scala:128)
+	scala.collection.immutable.List.apply(List.scala:79)
+	dotty.tools.dotc.util.Signatures$.applyCallInfo(Signatures.scala:244)
+	dotty.tools.dotc.util.Signatures$.computeSignatureHelp(Signatures.scala:101)
+	dotty.tools.dotc.util.Signatures$.signatureHelp(Signatures.scala:88)
+	dotty.tools.pc.SignatureHelpProvider$.signatureHelp(SignatureHelpProvider.scala:47)
+	dotty.tools.pc.ScalaPresentationCompiler.signatureHelp$$anonfun$1(ScalaPresentationCompiler.scala:422)
+```
+#### Short summary: 
+
+java.lang.IndexOutOfBoundsException: -1
