@@ -63,6 +63,7 @@ class ID_stage extends Module {
     val rf_we_ID = Output(Bool())
     val alu_op = Output(UInt(13.W))
     val mul_op = Output(UInt(2.W))
+    val div_op = Output(UInt(3.W))
     val mem_we = Output(Bool())
     val wb_from_mem = Output(Bool())
     val br_taken = Output(Bool())
@@ -86,7 +87,7 @@ class ID_stage extends Module {
   val valid = RegInit(false.B)
   val inst = RegInit(UInt(32.W), 0.U)
   // val inst = RegInit(UInt(32.W), 0.U)
-  val pc = Reg(UInt(32.W))
+  val pc = RegInit(UInt(32.W), 0.U)
   val inst_cancel = Wire(Bool())
   when(io.pre_valid&&io.ready){
     valid := true.B&&(~inst_cancel)
@@ -124,6 +125,7 @@ class ID_stage extends Module {
   val src1_is_pc = inst_frag_decoder.io.cs.src1_is_pc //
   io.alu_op := inst_frag_decoder.io.cs.alu_op
   io.mul_op := inst_frag_decoder.io.cs.mul_op
+  io.div_op := inst_frag_decoder.io.cs.div_op
   io.mem_we := inst_frag_decoder.io.cs.mem_we 
   io.wb_from_mem := inst_frag_decoder.io.cs.wb_from_mem
   val sign_ext_offs26 = inst_frag_decoder.io.cs.sign_ext_offs26 //
@@ -176,6 +178,8 @@ class EXE_stage extends Module {
     val rf_data2 = Input(SInt(32.W))
     val alu_op = Input(UInt(13.W))
     val mul_op = Input(UInt(2.W))
+    val div_op = Input(UInt(3.W))
+    val need_divmodule = Output(Bool())
     val mem_we_in = Input(Bool())
     val mem_we_out = Output(Bool())
     val wb_from_mem_in = Input(Bool())
@@ -190,26 +194,32 @@ class EXE_stage extends Module {
     val pc_in = Input(UInt(32.W))
     val pc_out = Output(UInt(32.W))
   })
-  io.ready := true.B
+  val ready = Wire(Bool())
+  io.ready := ready
   val valid = RegInit(false.B)
-  val pc = Reg(UInt(32.W))
-  val wb_addr = Reg(UInt(5.W))
-  val src1 = Reg(SInt(32.W))
-  val src2 = Reg(SInt(32.W))
-  val alu_op = Reg(UInt(13.W))
-  val mul_op = Reg(UInt(2.W))
+  val pc = RegInit(UInt(32.W), 0.U)
+  val wb_addr = RegInit(UInt(5.W), 0.U)
+  val src1 = RegInit(SInt(32.W), 0.S)
+  val src2 = RegInit(SInt(32.W), 0.S)
+  val alu_op = RegInit(UInt(13.W), 0.U)
+  val mul_op = RegInit(UInt(2.W), 0.U)
+  val div_op = RegInit(UInt(3.W), 0.U)
 
-  val mem_we = Reg(Bool())
-  val wb_from_mem = Reg(Bool())
-  val rf_we = Reg(Bool())
-  val rf_data2 = Reg(SInt(32.W))
+  val mem_we = RegInit(false.B)
+  val wb_from_mem = RegInit(false.B)
+  val rf_we = RegInit(false.B)
+  val rf_data2 = RegInit(SInt(32.W), 0.S)
+
+  val div_sign_ready = RegInit(false.B)
+  val div_unsign_ready = RegInit(false.B)
   when(io.pre_valid&&io.ready){
     valid := true.B
     pc := io.pc_in
     wb_addr := io.wb_addr_in
 
     alu_op := io.alu_op
-    mul_op :=io.mul_op
+    mul_op := io.mul_op
+    div_op := io.div_op
     src1 := io.src1
     src2 := io.src2
 
@@ -217,10 +227,13 @@ class EXE_stage extends Module {
     wb_from_mem := io.wb_from_mem_in
     rf_we := io.rf_we_in
     rf_data2 := io.rf_data2
-  }.elsewhen(valid&&io.next_ready){
+    div_sign_ready   := true.B
+    div_unsign_ready := true.B
+  }.elsewhen(valid&&io.next_ready&&(~div_op(2))){//当是除法指令时阻塞
     valid := false.B
   }
-  io.valid := valid
+
+  io.valid := valid&io.ready
   io.pc_out := pc 
   io.wb_addr_out := wb_addr
 
@@ -234,9 +247,38 @@ class EXE_stage extends Module {
   alu.io.mul_op:=mul_op
   alu.io.src1 := src1
   alu.io.src2 := src2
-  io.alu_res := alu.io.alu_res
   io.mem_addr := alu.io.mem_addr
   io.mem_data := rf_data2
+
+  // io.cs.div_op := Cat(need_divmodule,div_or_mod,div_sign_unsign)
+  val need_divmodule = div_op(2)
+  val div_or_mod     = div_op(1)
+  val div_sign_unsign= div_op(0)
+  val div_sign = Module(new div_sign())
+  val div_unsign = Module(new div_unsign())
+  //有符号除法
+  div_sign.io.aclk:=clock
+  div_sign.io.s_axis_dividend_tdata:=src1
+  div_sign.io.s_axis_divisor_tdata:=src2
+  when(need_divmodule&div_sign.io.s_axis_dividend_tready&&div_sign.io.s_axis_divisor_tready){div_sign_ready:=false.B}
+  div_sign.io.s_axis_divisor_tvalid:=need_divmodule&div_sign_ready
+  div_sign.io.s_axis_dividend_tvalid:=need_divmodule&div_sign_ready
+  val div_sign_res = div_sign.io.m_axis_dout_tdata
+  //无符号除法
+  div_unsign.io.aclk:=clock
+  div_unsign.io.s_axis_dividend_tdata:=src1.asUInt
+  div_unsign.io.s_axis_divisor_tdata:=src2.asUInt
+  when(need_divmodule&div_unsign.io.s_axis_dividend_tready&div_unsign.io.s_axis_divisor_tready){div_unsign_ready:=false.B}
+  div_unsign.io.s_axis_divisor_tvalid :=need_divmodule&div_unsign_ready
+  div_unsign.io.s_axis_dividend_tvalid:=need_divmodule&div_unsign_ready
+  val div_unsign_res = div_unsign.io.m_axis_dout_tdata
+  //有无符号选择
+  val divmod_res = Mux(div_sign_unsign,div_sign_res,div_unsign_res)
+  val div_res = Mux(div_or_mod,divmod_res(63,32).asSInt,divmod_res(31,0).asSInt)
+  io.alu_res := Mux(need_divmodule,div_res,alu.io.alu_res)
+  val div_res_valid = Mux(div_sign_unsign,div_sign.io.m_axis_dout_tvalid,div_unsign.io.m_axis_dout_tvalid)
+  ready:=(need_divmodule&div_res_valid)|(~need_divmodule)
+  io.need_divmodule:=need_divmodule&(~div_res_valid)
 
 }
 class MEM_stage extends Module {
@@ -258,11 +300,11 @@ class MEM_stage extends Module {
   })
   io.ready := true.B
   val valid = RegInit(false.B)
-  val pc = Reg(UInt(32.W))
-  val wb_addr = Reg(UInt(5.W))
-  val alu_res = Reg(SInt(32.W))
-  val rf_we = Reg(Bool())
-  val wb_from_mem = Reg(Bool())
+  val pc = RegInit(UInt(32.W), 0.U)
+  val wb_addr = RegInit(UInt(5.W), 0.U)
+  val alu_res = RegInit(SInt(32.W), 0.S)
+  val rf_we = RegInit(false.B)
+  val wb_from_mem = RegInit(false.B)
   when(io.pre_valid&&io.ready){
     valid := true.B
     pc := io.pc_in
@@ -297,10 +339,10 @@ class WB_stage extends Module {
   })
   io.ready := true.B
   val valid = RegInit(false.B)
-  val pc = Reg(UInt(32.W))
-  val wb_data = Reg(SInt(32.W))
-  val wb_addr = Reg(UInt(5.W))
-  val rf_we = Reg(Bool())
+  val pc = RegInit(UInt(32.W), 0.U)
+  val wb_data = RegInit(SInt(32.W), 0.S)
+  val wb_addr = RegInit(UInt(32.W), 0.U)
+  val rf_we = RegInit(false.B)
   when(io.pre_valid&&io.ready){
     valid := true.B
     pc := io.pc_in
@@ -370,6 +412,7 @@ class minicpu_top_pipline extends Module {
   exe_stage.io.rf_data2 := id_stage.io.rf_data2
   exe_stage.io.alu_op := id_stage.io.alu_op
   exe_stage.io.mul_op := id_stage.io.mul_op
+  exe_stage.io.div_op := id_stage.io.div_op
   exe_stage.io.mem_we_in := id_stage.io.mem_we
   exe_stage.io.wb_from_mem_in := id_stage.io.wb_from_mem
   exe_stage.io.rf_we_in := id_stage.io.rf_we_ID
@@ -443,8 +486,8 @@ class minicpu_top_pipline extends Module {
   block_judge.io.wb_rf_we    :=wb_stage.io.rf_we_out
   block_judge.io.wb_rf_waddr :=wb_stage.io.wb_addr_out
   block_judge.io.wb_wb_data:=wb_stage.io.wb_data_out
-  if_stage.io.needBlock:=block_judge.io.needBlock
-  id_stage.io.needBlock:=block_judge.io.needBlock
+  if_stage.io.needBlock:=block_judge.io.needBlock|exe_stage.io.need_divmodule
+  id_stage.io.needBlock:=block_judge.io.needBlock|exe_stage.io.need_divmodule
   id_stage.io.forward_rf_rdata1:=block_judge.io.forward_rf_rdata1
   id_stage.io.forward_rf_rdata2:=block_judge.io.forward_rf_rdata2
 }

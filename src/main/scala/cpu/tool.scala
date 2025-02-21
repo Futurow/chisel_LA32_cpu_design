@@ -1,6 +1,6 @@
 import chisel3._
 import chisel3.util._
-
+import chisel3.experimental._
 class N_2N_Decoder(n: Int) extends Module {
   val io = IO(new Bundle {
     val in = Input(UInt(n.W))
@@ -96,7 +96,8 @@ class Inst_Frag_Decoder_pipline extends Module {
     val sel_src2          = Output(UInt(5.W))    
     val src1_is_pc        = Output(Bool())      
     val alu_op            = Output(UInt(13.W)) 
-    val mul_op            = Output(UInt(2.W)) 
+    val mul_op            = Output(UInt(2.W))
+    val div_op            = Output(UInt(3.W))
     val mem_we            = Output(Bool()) 
     val wb_from_mem       = Output(Bool()) 
     val sign_ext_offs26   = Output(Bool()) 
@@ -140,6 +141,11 @@ class Inst_Frag_Decoder_pipline extends Module {
   val inst_mul_w  = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b1_1000)
   val inst_mulh_w = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b1_1001)
   val inst_mulh_wu= op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b1_1010)
+  
+  val inst_div_w  = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b10) & op_19_15_d(0b0_000)
+  val inst_mod_w  = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b10) & op_19_15_d(0b0_0001)
+  val inst_div_wu = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b10) & op_19_15_d(0b0_0010)
+  val inst_mod_wu = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b10) & op_19_15_d(0b0_0011)
 
   val inst_addi_w = op_31_26_d(0b00_0000) & op_25_22_d(0b1010)
   val inst_lu12i_w= op_31_26_d(0b00_0101) & (!io.op(10))
@@ -169,15 +175,20 @@ class Inst_Frag_Decoder_pipline extends Module {
   io.cs.rf_we:=inst_add_w|inst_sub_w |inst_slt |inst_sltu |inst_nor |inst_and |inst_or |inst_xor |
                inst_addi_w|inst_pcaddu12i |inst_lu12i_w |inst_slli_w |inst_srli_w |inst_srai_w |inst_sll_w|inst_srl_w|inst_sra_w|
                inst_jirl |inst_bl |inst_ld_w |inst_slti|inst_sltui|inst_andi|inst_ori|inst_xori|
-               inst_mul_w|inst_mulh_w|inst_mulh_wu
+               inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu
   // sel_src2独热码生成
-  val src2_is_R_data2 = inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_nor|inst_and|inst_or|inst_xor|inst_sll_w|inst_srl_w|inst_sra_w|inst_mul_w|inst_mulh_w|inst_mulh_wu
+  val src2_is_R_data2 = inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_nor|inst_and|inst_or|inst_xor|inst_sll_w|inst_srl_w|inst_sra_w|inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu
   val src2_is_ui12 = inst_andi|inst_ori|inst_xori
   val src2_is_si12 = inst_addi_w|inst_ld_w|inst_st_w|inst_slli_w|inst_srli_w|inst_srai_w|inst_slti|inst_sltui
   val src2_is_si20 = inst_lu12i_w|inst_pcaddu12i
   val src2_is_4 = inst_jirl|inst_bl
   io.cs.sel_src2 := Cat(src2_is_R_data2,src2_is_ui12,src2_is_si12,src2_is_si20,src2_is_4)
   io.cs.src1_is_pc := inst_jirl|inst_bl|inst_pcaddu12i
+  // 除法和mod指令的div_op
+  val need_divmodule = inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu
+  val div_or_mod = (inst_div_w|inst_div_wu)&&(~(inst_mod_w|inst_mod_wu))
+  val div_sign_unsign = (inst_div_w|inst_mod_w)&&(~(inst_div_wu|inst_mod_wu))
+  io.cs.div_op := Cat(need_divmodule,div_or_mod,div_sign_unsign)
   // ALU_OP独热码生成
   val alu_add = inst_add_w|inst_addi_w|inst_jirl|inst_bl|inst_pcaddu12i
   val alu_mul = inst_mul_w|inst_mulh_w|inst_mulh_wu
@@ -204,11 +215,11 @@ class Inst_Frag_Decoder_pipline extends Module {
   io.cs.need_rf_raddr1:=inst_add_w|inst_sub_w|inst_addi_w|inst_slt|inst_sltu|inst_and|inst_or|inst_nor|inst_xor|
                         inst_slli_w|inst_srli_w|inst_srai_w|inst_beq|inst_bne|inst_jirl|inst_st_w|inst_ld_w|
                         inst_slti|inst_sltui|inst_andi|inst_ori|inst_xori|inst_sll_w|inst_srl_w|inst_sra_w|
-                        inst_mul_w|inst_mulh_w|inst_mulh_wu
+                        inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu
 
   io.cs.need_rf_raddr2:=inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_and|inst_or|inst_nor|inst_xor|
                         inst_beq|inst_bne|inst_st_w|inst_sll_w|inst_srl_w|inst_sra_w|
-                        inst_mul_w|inst_mulh_w|inst_mulh_wu
+                        inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu
 
   io.cs.inst_cancel:=inst_jirl|inst_b|inst_bl|(inst_beq&&io.rj_eq_rd)|(inst_bne&&(!io.rj_eq_rd))
 
@@ -282,6 +293,32 @@ class ALU extends Module {
       add_w_res
     )
   )
+}
+class div_sign extends BlackBox {
+  val io = IO(new Bundle {
+    val aclk = Input(Clock())
+    val s_axis_divisor_tdata=Input(SInt(32.W))//除数
+    val s_axis_dividend_tdata=Input(SInt(32.W))//被除数
+    val s_axis_divisor_tvalid=Input(Bool())
+    val s_axis_dividend_tvalid=Input(Bool())
+    val s_axis_divisor_tready=Output(Bool())
+    val s_axis_dividend_tready=Output(Bool())
+    val m_axis_dout_tdata=Output(UInt(64.W))
+    val m_axis_dout_tvalid=Output(Bool())
+  })
+}
+class div_unsign extends BlackBox {
+  val io = IO(new Bundle {
+    val aclk = Input(Clock())
+    val s_axis_divisor_tdata=Input(UInt(32.W))//除数
+    val s_axis_dividend_tdata=Input(UInt(32.W))//被除数
+    val s_axis_divisor_tvalid=Input(Bool())
+    val s_axis_dividend_tvalid=Input(Bool())
+    val s_axis_divisor_tready=Output(Bool())
+    val s_axis_dividend_tready=Output(Bool())
+    val m_axis_dout_tdata=Output(UInt(64.W))
+    val m_axis_dout_tvalid=Output(Bool())
+  })
 }
 class Block_Judge extends Module{
   val io = IO(new Bundle {

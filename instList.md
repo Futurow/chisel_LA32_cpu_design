@@ -22,6 +22,10 @@ cpu实现的指令集合
  mul.w   rd, rj, rk
  mulh.w  rd, rj, rk
  mulh.wu rd, rj, rk
+ div.w   rd, rj, rk
+ mod.w   rd, rj, rk
+ div.wu  rd, rj, rk
+ mod.wu  rd, rj, rk
 ```
 ### 移位运算类指令
 ```
