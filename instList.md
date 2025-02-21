@@ -41,6 +41,10 @@ cpu实现的指令集合
 ```
  beq     rj, rd, offs16
  bne     rj, rd, offs16
+ blt     rj, rd, offs16
+ bge     rj, rd, offs16
+ bltu    rj, rd, offs16
+ bgeu    rj, rd, offs16
  b               offs26
  bl              offs26
  jirl    rd, rj, offs16

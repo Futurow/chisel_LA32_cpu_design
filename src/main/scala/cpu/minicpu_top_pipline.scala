@@ -114,9 +114,13 @@ class ID_stage extends Module {
   val offs26 = Cat(inst(9, 0), inst(25, 10))
   // 译码
   val rj_eq_rd = Wire(Bool())
+  val rj_less_rd = Wire(Bool())
+  val rj_lessu_rd = Wire(Bool())
   val inst_frag_decoder = Module(new Inst_Frag_Decoder_pipline())
   inst_frag_decoder.io.op := inst_op
-  inst_frag_decoder.io.rj_eq_rd := rj_eq_rd
+  inst_frag_decoder.io.rj_eq_rd   := rj_eq_rd
+  inst_frag_decoder.io.rj_less_rd := rj_less_rd
+  inst_frag_decoder.io.rj_lessu_rd:= rj_lessu_rd
   // 控制信号
   val src_reg_is_rd = inst_frag_decoder.io.cs.src_reg_is_rd //
   val w_addr_is_1 = inst_frag_decoder.io.cs.w_addr_is_1 //
@@ -150,7 +154,9 @@ class ID_stage extends Module {
   io.to_forward_rf_data2:=rf_regfile.io.rdata2
   val gr_rj = io.forward_rf_rdata1
   val gr_rdk = io.forward_rf_rdata2
-  rj_eq_rd := (gr_rj === gr_rdk)
+  rj_eq_rd   := (gr_rj === gr_rdk)
+  rj_less_rd := (gr_rj < gr_rdk)
+  rj_lessu_rd:= (gr_rj.asUInt < gr_rdk.asUInt)
   io.rf_data1 := gr_rj
   io.rf_data2 := gr_rdk
   // 立即数扩展
