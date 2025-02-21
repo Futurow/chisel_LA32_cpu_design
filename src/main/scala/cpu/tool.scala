@@ -334,6 +334,7 @@ class div_sign extends BlackBox {
     val m_axis_dout_tdata=Output(UInt(64.W))
     val m_axis_dout_tvalid=Output(Bool())
   })
+  //使用xilinx的div IP实现
 }
 class div_unsign extends BlackBox {
   val io = IO(new Bundle {
@@ -347,6 +348,7 @@ class div_unsign extends BlackBox {
     val m_axis_dout_tdata=Output(UInt(64.W))
     val m_axis_dout_tvalid=Output(Bool())
   })
+  //使用xilinx的div IP实现
 }
 class Block_Judge extends Module{
   val io = IO(new Bundle {
