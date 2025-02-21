@@ -1,3 +1,16 @@
+file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/minicpu_top_pipline.scala
+### java.lang.IndexOutOfBoundsException: -1
+
+occurred in the presentation compiler.
+
+presentation compiler configuration:
+
+
+action parameters:
+offset: 17150
+uri: file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/minicpu_top_pipline.scala
+text:
+```scala
 import chisel3._
 import chisel3.util._
 class pre_IF extends Module {
@@ -472,11 +485,8 @@ class minicpu_top_pipline extends Module {
   val data_sram_we = Wire(UInt(4.W))
   when(exe_stage.io.mem_we_out){
     when(mem_is_w){
-      data_sram_we:=0b1111.U
-    }.elsewhen(mem_b_h){
-      data_sram_we:=Mux(byte_addr(1),Mux(byte_addr(0),0b1000.U,0b0100.U),
-                                     Mux(byte_addr(0),0b0010.U,0b0001.U))
-    }.otherwise{//halfword
+
+    }.elsewhen()@@.otherwise{//halfword
       data_sram_we:=Mux(byte_addr(1),0b1100.U,0b0011.U)
     }
   }.otherwise{
@@ -547,3 +557,23 @@ class minicpu_top_pipline extends Module {
   id_stage.io.forward_rf_rdata1:=block_judge.io.forward_rf_rdata1
   id_stage.io.forward_rf_rdata2:=block_judge.io.forward_rf_rdata2
 }
+
+```
+
+
+
+#### Error stacktrace:
+
+```
+scala.collection.LinearSeqOps.apply(LinearSeq.scala:129)
+	scala.collection.LinearSeqOps.apply$(LinearSeq.scala:128)
+	scala.collection.immutable.List.apply(List.scala:79)
+	dotty.tools.dotc.util.Signatures$.applyCallInfo(Signatures.scala:244)
+	dotty.tools.dotc.util.Signatures$.computeSignatureHelp(Signatures.scala:101)
+	dotty.tools.dotc.util.Signatures$.signatureHelp(Signatures.scala:88)
+	dotty.tools.pc.SignatureHelpProvider$.signatureHelp(SignatureHelpProvider.scala:47)
+	dotty.tools.pc.ScalaPresentationCompiler.signatureHelp$$anonfun$1(ScalaPresentationCompiler.scala:422)
+```
+#### Short summary: 
+
+java.lang.IndexOutOfBoundsException: -1

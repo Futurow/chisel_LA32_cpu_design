@@ -1,3 +1,16 @@
+file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/minicpu_top_pipline.scala
+### java.lang.IndexOutOfBoundsException: -1
+
+occurred in the presentation compiler.
+
+presentation compiler configuration:
+
+
+action parameters:
+offset: 12268
+uri: file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/minicpu_top_pipline.scala
+text:
+```scala
 import chisel3._
 import chisel3.util._
 class pre_IF extends Module {
@@ -341,17 +354,11 @@ class MEM_stage extends Module {
   io.wb_addr_out := wb_addr
   io.rf_we_out := rf_we && valid
   // io.cs.mem_pattern:= Cat(mem_is_w,mem_b_h,mem_s_u)
-  val mem_is_w=mem_pattern(2)
-  val mem_b_h =mem_pattern(1)
-  val mem_s_u =mem_pattern(0)
-  val byte = Mux(mem_byte_addr(1),Mux(mem_byte_addr(0),io.mem_value(31,24),io.mem_value(23,16))
-                                 ,Mux(mem_byte_addr(0),io.mem_value(15,8),io.mem_value(7,0)))
-  val halfword = Mux(mem_byte_addr(1),io.mem_value(31,16),io.mem_value(15,0))
-  val byte_ext = Mux(mem_s_u,byte.asSInt,Cat(0.U(24.W),byte).asSInt)
-  val halfword_ext =Mux(mem_s_u,halfword.asSInt,Cat(0.U(12.W),halfword).asSInt)
-  val mem_ext = Mux(mem_b_h,byte_ext,halfword_ext)
-  val mem_res = Mux(mem_is_w,io.mem_value,mem_ext)
-  io.wb_data := Mux(wb_from_mem, mem_res, alu_res)
+  val mem_is_w=mem_pattern()
+  val mem_b_h=mem_pattern(@@)
+  val mem_s_u=mem_pattern
+
+  io.wb_data := Mux(wb_from_mem, io.mem_value, alu_res)
 
 }
 class WB_stage extends Module {
@@ -446,7 +453,6 @@ class minicpu_top_pipline extends Module {
   exe_stage.io.mul_op := id_stage.io.mul_op
   exe_stage.io.div_op := id_stage.io.div_op
   exe_stage.io.mem_we_in := id_stage.io.mem_we
-  exe_stage.io.mem_pattern_in:=id_stage.io.mem_pattern
   exe_stage.io.wb_from_mem_in := id_stage.io.wb_from_mem
   exe_stage.io.rf_we_in := id_stage.io.rf_we_ID
   exe_stage.io.wb_addr_in := id_stage.io.wb_addr_out
@@ -458,34 +464,11 @@ class minicpu_top_pipline extends Module {
   mem_stage.io.pre_valid := exe_stage.io.valid
   mem_stage.io.alu_res := exe_stage.io.alu_res
   mem_stage.io.wb_from_mem := exe_stage.io.wb_from_mem_out
-  mem_stage.io.mem_byte_addr :=exe_stage.io.mem_byte_addr
-  mem_stage.io.mem_pattern_in   :=exe_stage.io.mem_pattern_out//Cat(mem_is_w,mem_b_h,mem_s_u)
-
   io.data_sram_en := true.B
-  val mem_is_w = exe_stage.io.mem_pattern_out(2)
-  val mem_b_h = exe_stage.io.mem_pattern_out(1)
-  val byte_addr=  exe_stage.io.mem_addr(1,0)
-  val rd_data = exe_stage.io.mem_data
-  val st_data = Mux(mem_is_w,rd_data,
-                             Mux(mem_b_h,Cat(rd_data(7,0),rd_data(7,0),rd_data(7,0),rd_data(7,0)).asSInt
-                                 ,Cat(rd_data(15,0),rd_data(15,0)).asSInt))
-  val data_sram_we = Wire(UInt(4.W))
-  when(exe_stage.io.mem_we_out){
-    when(mem_is_w){
-      data_sram_we:=0b1111.U
-    }.elsewhen(mem_b_h){
-      data_sram_we:=Mux(byte_addr(1),Mux(byte_addr(0),0b1000.U,0b0100.U),
-                                     Mux(byte_addr(0),0b0010.U,0b0001.U))
-    }.otherwise{//halfword
-      data_sram_we:=Mux(byte_addr(1),0b1100.U,0b0011.U)
-    }
-  }.otherwise{
-    data_sram_we:=0b0000.U
-  }
-  io.data_sram_we := data_sram_we
+  val dsramwe = exe_stage.io.mem_we_out
+  io.data_sram_we := Cat(dsramwe, dsramwe, dsramwe, dsramwe)
   io.data_sram_addr := exe_stage.io.mem_addr
-  io.data_sram_wdata := st_data
-
+  io.data_sram_wdata := exe_stage.io.mem_data
   mem_stage.io.mem_value := io.data_sram_rdata
   mem_stage.io.rf_we_in := exe_stage.io.rf_we_out
   mem_stage.io.wb_addr_in := exe_stage.io.wb_addr_out
@@ -547,3 +530,23 @@ class minicpu_top_pipline extends Module {
   id_stage.io.forward_rf_rdata1:=block_judge.io.forward_rf_rdata1
   id_stage.io.forward_rf_rdata2:=block_judge.io.forward_rf_rdata2
 }
+
+```
+
+
+
+#### Error stacktrace:
+
+```
+scala.collection.LinearSeqOps.apply(LinearSeq.scala:129)
+	scala.collection.LinearSeqOps.apply$(LinearSeq.scala:128)
+	scala.collection.immutable.List.apply(List.scala:79)
+	dotty.tools.dotc.util.Signatures$.applyCallInfo(Signatures.scala:244)
+	dotty.tools.dotc.util.Signatures$.computeSignatureHelp(Signatures.scala:101)
+	dotty.tools.dotc.util.Signatures$.signatureHelp(Signatures.scala:88)
+	dotty.tools.pc.SignatureHelpProvider$.signatureHelp(SignatureHelpProvider.scala:47)
+	dotty.tools.pc.ScalaPresentationCompiler.signatureHelp$$anonfun$1(ScalaPresentationCompiler.scala:422)
+```
+#### Short summary: 
+
+java.lang.IndexOutOfBoundsException: -1

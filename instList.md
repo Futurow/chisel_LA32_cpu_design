@@ -51,6 +51,12 @@ cpu实现的指令集合
 ```
 ### 普通访存指令
 ```
- ld.w rd, rj, si12
- st.w rd, rj, si12
+ ld.w  rd, rj, si12
+ ld.b  rd, rj, si12
+ ld.h  rd, rj, si12
+ ld.bu rd, rj, si12
+ ld.hu rd, rj, si12
+ st.w  rd, rj, si12
+ st.b  rd, rj, si12
+ st.h  rd, rj, si12
 ```
