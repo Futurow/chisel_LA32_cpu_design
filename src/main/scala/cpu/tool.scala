@@ -110,6 +110,8 @@ class Inst_Frag_Decoder_pipline extends Module {
   val io = IO(new Bundle {
     val op = Input(UInt(17.W))
     val rj_eq_rd = Input(Bool())
+    val rj_less_rd = Input(Bool())
+    val rj_lessu_rd = Input(Bool())
     val cs = new controlBundle
   })
   val Decoder6_64 = Module(new N_2N_Decoder(6))
@@ -165,11 +167,15 @@ class Inst_Frag_Decoder_pipline extends Module {
   val inst_bl   = op_31_26_d(0b01_0101)
   val inst_beq  = op_31_26_d(0b01_0110)
   val inst_bne  = op_31_26_d(0b01_0111)
+  val inst_blt  = op_31_26_d(0b01_1000)
+  val inst_bge  = op_31_26_d(0b01_1001)
+  val inst_bltu = op_31_26_d(0b01_1010)
+  val inst_bgeu = op_31_26_d(0b01_1011)
 
   val inst_ld_w = op_31_26_d(0b00_1010) & op_25_22_d(0b0010)
   val inst_st_w = op_31_26_d(0b00_1010) & op_25_22_d(0b0110)
   // 控制信号生成(新指令需要判断rf1和rf2的读取情况)
-  io.cs.src_reg_is_rd := inst_beq | inst_bne | inst_st_w
+  io.cs.src_reg_is_rd := inst_beq | inst_bne | inst_st_w|inst_blt|inst_bltu|inst_bge|inst_bgeu
   io.cs.w_addr_is_1 := inst_bl
   // io.cs.rf_we := !(inst_b | inst_beq | inst_bne | inst_st_w)
   io.cs.rf_we:=inst_add_w|inst_sub_w |inst_slt |inst_sltu |inst_nor |inst_and |inst_or |inst_xor |
@@ -209,19 +215,25 @@ class Inst_Frag_Decoder_pipline extends Module {
   io.cs.mem_we := inst_st_w
   io.cs.wb_from_mem := inst_ld_w
   io.cs.sign_ext_offs26 := inst_b|inst_bl
-  io.cs.base_pc_add_offs := inst_jirl|inst_b|inst_bl|(inst_beq&&io.rj_eq_rd)|(inst_bne&&(!io.rj_eq_rd))
+  io.cs.base_pc_add_offs := inst_jirl|inst_b|inst_bl|(inst_beq&&io.rj_eq_rd)|(inst_bne&&(!io.rj_eq_rd))|
+                            (inst_blt&&io.rj_less_rd)|(inst_bltu&&io.rj_lessu_rd)|
+                            (inst_bge&&(~io.rj_less_rd))|(inst_bgeu&&(~io.rj_lessu_rd))
   io.cs.base_pc_from_rj := inst_jirl
   
   io.cs.need_rf_raddr1:=inst_add_w|inst_sub_w|inst_addi_w|inst_slt|inst_sltu|inst_and|inst_or|inst_nor|inst_xor|
                         inst_slli_w|inst_srli_w|inst_srai_w|inst_beq|inst_bne|inst_jirl|inst_st_w|inst_ld_w|
                         inst_slti|inst_sltui|inst_andi|inst_ori|inst_xori|inst_sll_w|inst_srl_w|inst_sra_w|
-                        inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu
+                        inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu|
+                        inst_blt|inst_bltu|inst_bge|inst_bgeu
 
   io.cs.need_rf_raddr2:=inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_and|inst_or|inst_nor|inst_xor|
                         inst_beq|inst_bne|inst_st_w|inst_sll_w|inst_srl_w|inst_sra_w|
-                        inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu
+                        inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu|
+                        inst_blt|inst_bltu|inst_bge|inst_bgeu
 
-  io.cs.inst_cancel:=inst_jirl|inst_b|inst_bl|(inst_beq&&io.rj_eq_rd)|(inst_bne&&(!io.rj_eq_rd))
+  io.cs.inst_cancel:=inst_jirl|inst_b|inst_bl|(inst_beq&&io.rj_eq_rd)|(inst_bne&&(!io.rj_eq_rd))|
+                     (inst_blt&&io.rj_less_rd)|(inst_bltu&&io.rj_lessu_rd)|
+                     (inst_bge&&(~io.rj_less_rd))|(inst_bgeu&&(~io.rj_lessu_rd))
 
 }
 class RegFile extends Module {
