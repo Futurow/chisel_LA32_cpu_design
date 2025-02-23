@@ -107,9 +107,10 @@ class Inst_Frag_Decoder_pipline extends Module {
     val need_rf_raddr1    = Output(Bool())
     val need_rf_raddr2    = Output(Bool())
     val inst_cancel       = Output(Bool())
+    val instNoExist       = Output(Bool())
 }
   val io = IO(new Bundle {
-    val op = Input(UInt(17.W))
+    val op = Input(UInt(32.W))
     val rj_eq_rd = Input(Bool())
     val rj_less_rd = Input(Bool())
     val rj_lessu_rd = Input(Bool())
@@ -119,10 +120,10 @@ class Inst_Frag_Decoder_pipline extends Module {
   val Decoder5_32 = Module(new N_2N_Decoder(5))
   val Decoder4_16 = Module(new N_2N_Decoder(4))
   val Decoder2_4 = Module(new N_2N_Decoder(2))
-  Decoder6_64.io.in := io.op(16, 11)
-  Decoder4_16.io.in := io.op(10, 7)
-  Decoder2_4.io.in := io.op(6, 5)
-  Decoder5_32.io.in := io.op(4, 0)
+  Decoder6_64.io.in := io.op(31,26)
+  Decoder4_16.io.in := io.op(25,22)
+  Decoder2_4.io.in :=  io.op(21,20)
+  Decoder5_32.io.in := io.op(19,15)
   val op_31_26_d = Decoder6_64.io.out
   val op_25_22_d = Decoder4_16.io.out
   val op_21_20_d = Decoder2_4.io.out
@@ -133,7 +134,7 @@ class Inst_Frag_Decoder_pipline extends Module {
   val inst_slt    = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_0100)
   val inst_sltu   = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_0101)
   val inst_nor    = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_1000)
-  val inst_pcaddu12i = op_31_26_d(0b00_0111) & (!io.op(10))
+  val inst_pcaddu12i = op_31_26_d(0b00_0111) & (!io.op(25))
   val inst_and    = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_1001)
   val inst_or     = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_1010)
   val inst_xor    = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_1011)
@@ -151,7 +152,7 @@ class Inst_Frag_Decoder_pipline extends Module {
   val inst_mod_wu = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b10) & op_19_15_d(0b0_0011)
 
   val inst_addi_w = op_31_26_d(0b00_0000) & op_25_22_d(0b1010)
-  val inst_lu12i_w= op_31_26_d(0b00_0101) & (!io.op(10))
+  val inst_lu12i_w= op_31_26_d(0b00_0101) & (!io.op(25))
   val inst_slti   = op_31_26_d(0b00_0000) & op_25_22_d(0b1000)
   val inst_sltui  = op_31_26_d(0b00_0000) & op_25_22_d(0b1001)
 
@@ -182,6 +183,17 @@ class Inst_Frag_Decoder_pipline extends Module {
   val inst_st_b = op_31_26_d(0b00_1010) & op_25_22_d(0b0100)
   val inst_st_h = op_31_26_d(0b00_1010) & op_25_22_d(0b0101)
   val inst_st_w = op_31_26_d(0b00_1010) & op_25_22_d(0b0110)
+
+  val rj0=(io.op(9,5)===0.U(5.W))
+  val rj1=(io.op(9,5)===1.U(5.W))
+  val inst_csrrd  = op_31_26_d(0b00_0001)&(!io.op(25))&(!io.op(25))&rj0
+  val inst_csrwr  = op_31_26_d(0b00_0001)&(!io.op(25))&(!io.op(25))&rj1
+  val inst_csrxchg= op_31_26_d(0b00_0001)&(!io.op(25))&(!io.op(25))&(!rj0)&(!rj1)
+  //指令不存在异常
+  io.cs.instNoExist = !(inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_nor|inst_pcaddu12i|inst_and|inst_or|inst_xor|inst_andi|inst_ori|inst_xori| 
+                        inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_mod_w|inst_div_wu|inst_mod_wu|inst_addi_w|inst_lu12i_w|inst_slti|
+                        inst_sltui|inst_sll_w|inst_srl_w|inst_sra_w|inst_slli_w|inst_srli_w|inst_srai_w|inst_bne|inst_blt|inst_bge|inst_bltu|
+                        inst_bgeu|inst_ld_b|inst_ld_h|inst_ld_w|inst_ld_bu|inst_ld_hu|inst_st_b|inst_st_h|inst_st_w)
   // 控制信号生成(新指令需要判断rf1和rf2的读取情况)
   io.cs.src_reg_is_rd := inst_beq | inst_bne | inst_st_w|inst_blt|inst_bltu|inst_bge|inst_bgeu|
                          inst_st_b| inst_st_h
@@ -426,4 +438,54 @@ class Block_Judge extends Module{
     io.forward_rf_rdata2:=io.rf_rdata2
     block_rf2:=false.B}
   io.needBlock:=block_rf1||block_rf2
+}
+class CSR extends Module{
+  val io = IO(new Bundle {
+    val csr_re = Input(Bool())
+    val csr_num = Input(UInt(14.W))
+    val csr_rvalue = Output(UInt(32.W))
+    val csr_we = Input(Bool())
+    val csr_wmask = Input(UInt(32.W))
+    val csr_wvalue = Input(UInt(32.W))
+  })
+  // 寄存器定义（全部初始化为0）
+  val CRMD   = RegInit(0.U(32.W))  // 0x0
+  val PRMD   = RegInit(0.U(32.W))  // 0x1
+  val ESTAT  = RegInit(0.U(32.W))  // 0x5
+  val ERA    = RegInit(0.U(32.W))  // 0x6
+  val EENTRY = RegInit(0.U(32.W))  // 0xc
+  val SAVE0  = RegInit(0.U(32.W))  // 0x30
+  val SAVE1  = RegInit(0.U(32.W))  // 0x31
+  val SAVE2  = RegInit(0.U(32.W))  // 0x32
+  val SAVE3  = RegInit(0.U(32.W))  // 0x33
+
+  // 读逻辑
+  io.csr_rvalue := 0.U
+  when(io.csr_re) {
+    switch(io.csr_num) {
+      is(0x0.U)  { io.csr_rvalue := CRMD }
+      is(0x1.U)  { io.csr_rvalue := PRMD }
+      is(0x5.U)  { io.csr_rvalue := ESTAT }
+      is(0x6.U)  { io.csr_rvalue := ERA }
+      is(0xc.U)  { io.csr_rvalue := EENTRY }
+      is(0x30.U) { io.csr_rvalue := SAVE0 }
+      is(0x31.U) { io.csr_rvalue := SAVE1 }
+      is(0x32.U) { io.csr_rvalue := SAVE2 }
+      is(0x33.U) { io.csr_rvalue := SAVE3 }
+    }
+  }
+  // 写逻辑（带掩码功能）
+  when(io.csr_we) {
+    switch(io.csr_num) {
+      is(0x0.U)  { CRMD   := (CRMD   & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+      is(0x1.U)  { PRMD   := (PRMD   & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+      is(0x5.U)  { ESTAT  := (ESTAT  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+      is(0x6.U)  { ERA    := (ERA    & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+      is(0xc.U)  { EENTRY := (EENTRY & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+      is(0x30.U) { SAVE0  := (SAVE0  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+      is(0x31.U) { SAVE1  := (SAVE1  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+      is(0x32.U) { SAVE2  := (SAVE2  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+      is(0x33.U) { SAVE3  := (SAVE3  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+    }
+  }
 }

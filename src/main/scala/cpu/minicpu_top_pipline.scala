@@ -32,6 +32,7 @@ class IF_stage extends Module {
     val inst = Output(UInt(32.W))
     val inst_sram_addr = Output(UInt(32.W))
     val pc = Output(UInt(32.W))
+    val inst_fetch_addr_err = Output(Bool())
   })
   val valid = RegInit(false.B)
   val ready= true.B
@@ -45,6 +46,8 @@ class IF_stage extends Module {
   io.inst_sram_addr := Mux(io.needBlock,inst_pc,Mux(io.br_taken,io.nextpc,inst_pc + 4.U))
   io.inst := io.inst_sram_rdata
   io.pc:=inst_pc
+  //最低两位为0
+  io.inst_fetch_addr_err:=io.inst_sram_rdata(1)|io.inst_sram_rdata(0)
 }
 class ID_stage extends Module {
   val io = IO(new Bundle {
@@ -104,7 +107,7 @@ class ID_stage extends Module {
   // val pc = RegInit(UInt(32.W), 0x1c000000.U) // 0x1bfffffc
   io.pc_out := pc
 
-  val inst_op = inst(31, 15)
+  val inst_op = inst
   val rj = inst(9, 5)
   val rk = inst(14, 10)
   val rd = inst(4, 0)
@@ -204,6 +207,7 @@ class EXE_stage extends Module {
     val wb_addr_out = Output(UInt(5.W))
     val pc_in = Input(UInt(32.W))
     val pc_out = Output(UInt(32.W))
+    val mem_addr_err = Output(Bool())
   })
   val ready = Wire(Bool())
   io.ready := ready
@@ -294,6 +298,20 @@ class EXE_stage extends Module {
   val div_res_valid = Mux(div_sign_unsign,div_sign.io.m_axis_dout_tvalid,div_unsign.io.m_axis_dout_tvalid)
   ready:=(need_divmodule&div_res_valid)|(~need_divmodule)
   io.need_divmodule:=need_divmodule&(~div_res_valid)
+  //访存地址错误
+  //wb_from_mem_out
+  //mem_we_out
+  val mem_is_w=mem_pattern_out(2)
+  val mem_b_h =mem_pattern_out(1)
+  val mem_s_u =mem_pattern_out(0)
+  //mem_addr_err
+  when(io.wb_from_mem_out|mem_we_out){//读内存或写内存
+    when(mem_is_w&(io.mem_addr(1,0)=/=0.U)){//4字节,最低2位非0
+      io.mem_addr_err:=true.B
+    }.elsewhen((!mem_b_h)&(!io.mem_addr(0))){//2字节,最低位非0
+      io.mem_addr_err:=true.B
+    }.otherwise{io.mem_addr_err:=false.B}
+  }.otherwise{io.mem_addr_err:=false.B}
 
 }
 class MEM_stage extends Module {
