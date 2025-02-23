@@ -1,3 +1,16 @@
+file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/tool.scala
+### java.lang.IndexOutOfBoundsException: -1
+
+occurred in the presentation compiler.
+
+presentation compiler configuration:
+
+
+action parameters:
+offset: 9468
+uri: file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/tool.scala
+text:
+```scala
 import chisel3._
 import chisel3.util._
 import chisel3.experimental._
@@ -107,10 +120,9 @@ class Inst_Frag_Decoder_pipline extends Module {
     val need_rf_raddr1    = Output(Bool())
     val need_rf_raddr2    = Output(Bool())
     val inst_cancel       = Output(Bool())
-    val instNoExist       = Output(Bool())
 }
   val io = IO(new Bundle {
-    val op = Input(UInt(32.W))
+    val op = Input(UInt(17.W))
     val rj_eq_rd = Input(Bool())
     val rj_less_rd = Input(Bool())
     val rj_lessu_rd = Input(Bool())
@@ -120,10 +132,10 @@ class Inst_Frag_Decoder_pipline extends Module {
   val Decoder5_32 = Module(new N_2N_Decoder(5))
   val Decoder4_16 = Module(new N_2N_Decoder(4))
   val Decoder2_4 = Module(new N_2N_Decoder(2))
-  Decoder6_64.io.in := io.op(31,26)
-  Decoder4_16.io.in := io.op(25,22)
-  Decoder2_4.io.in :=  io.op(21,20)
-  Decoder5_32.io.in := io.op(19,15)
+  Decoder6_64.io.in := io.op(16, 11)
+  Decoder4_16.io.in := io.op(10, 7)
+  Decoder2_4.io.in := io.op(6, 5)
+  Decoder5_32.io.in := io.op(4, 0)
   val op_31_26_d = Decoder6_64.io.out
   val op_25_22_d = Decoder4_16.io.out
   val op_21_20_d = Decoder2_4.io.out
@@ -134,7 +146,7 @@ class Inst_Frag_Decoder_pipline extends Module {
   val inst_slt    = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_0100)
   val inst_sltu   = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_0101)
   val inst_nor    = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_1000)
-  val inst_pcaddu12i = op_31_26_d(0b00_0111) & (!io.op(25))
+  val inst_pcaddu12i = op_31_26_d(0b00_0111) & (!io.op(10))
   val inst_and    = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_1001)
   val inst_or     = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_1010)
   val inst_xor    = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b01) & op_19_15_d(0b0_1011)
@@ -152,7 +164,7 @@ class Inst_Frag_Decoder_pipline extends Module {
   val inst_mod_wu = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b10) & op_19_15_d(0b0_0011)
 
   val inst_addi_w = op_31_26_d(0b00_0000) & op_25_22_d(0b1010)
-  val inst_lu12i_w= op_31_26_d(0b00_0101) & (!io.op(25))
+  val inst_lu12i_w= op_31_26_d(0b00_0101) & (!io.op(10))
   val inst_slti   = op_31_26_d(0b00_0000) & op_25_22_d(0b1000)
   val inst_sltui  = op_31_26_d(0b00_0000) & op_25_22_d(0b1001)
 
@@ -184,16 +196,9 @@ class Inst_Frag_Decoder_pipline extends Module {
   val inst_st_h = op_31_26_d(0b00_1010) & op_25_22_d(0b0101)
   val inst_st_w = op_31_26_d(0b00_1010) & op_25_22_d(0b0110)
 
-  val rj0=(io.op(9,5)===0.U(5.W))
-  val rj1=(io.op(9,5)===1.U(5.W))
-  val inst_csrrd  = op_31_26_d(0b00_0001)&(!io.op(25))&(!io.op(25))&rj0
-  val inst_csrwr  = op_31_26_d(0b00_0001)&(!io.op(25))&(!io.op(25))&rj1
-  val inst_csrxchg= op_31_26_d(0b00_0001)&(!io.op(25))&(!io.op(25))&(!rj0)&(!rj1)
-  //指令不存在异常
-  io.cs.instNoExist = !(inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_nor|inst_pcaddu12i|inst_and|inst_or|inst_xor|inst_andi|inst_ori|inst_xori| 
-                        inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_mod_w|inst_div_wu|inst_mod_wu|inst_addi_w|inst_lu12i_w|inst_slti|
-                        inst_sltui|inst_sll_w|inst_srl_w|inst_sra_w|inst_slli_w|inst_srli_w|inst_srai_w|inst_bne|inst_blt|inst_bge|inst_bltu|
-                        inst_bgeu|inst_ld_b|inst_ld_h|inst_ld_w|inst_ld_bu|inst_ld_hu|inst_st_b|inst_st_h|inst_st_w)
+  val inst_csrrd  = op_31_26_d(@@)
+  val inst_csrwr  = op_31_26_d()
+  val inst_csrxchg= op_31_26_d()
   // 控制信号生成(新指令需要判断rf1和rf2的读取情况)
   io.cs.src_reg_is_rd := inst_beq | inst_bne | inst_st_w|inst_blt|inst_bltu|inst_bge|inst_bgeu|
                          inst_st_b| inst_st_h
@@ -489,3 +494,22 @@ class CSR extends Module{
     }
   }
 }
+```
+
+
+
+#### Error stacktrace:
+
+```
+scala.collection.LinearSeqOps.apply(LinearSeq.scala:129)
+	scala.collection.LinearSeqOps.apply$(LinearSeq.scala:128)
+	scala.collection.immutable.List.apply(List.scala:79)
+	dotty.tools.dotc.util.Signatures$.applyCallInfo(Signatures.scala:244)
+	dotty.tools.dotc.util.Signatures$.computeSignatureHelp(Signatures.scala:101)
+	dotty.tools.dotc.util.Signatures$.signatureHelp(Signatures.scala:88)
+	dotty.tools.pc.SignatureHelpProvider$.signatureHelp(SignatureHelpProvider.scala:47)
+	dotty.tools.pc.ScalaPresentationCompiler.signatureHelp$$anonfun$1(ScalaPresentationCompiler.scala:422)
+```
+#### Short summary: 
+
+java.lang.IndexOutOfBoundsException: -1
