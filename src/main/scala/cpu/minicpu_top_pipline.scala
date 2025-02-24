@@ -301,11 +301,11 @@ class EXE_stage extends Module {
   //访存地址错误
   //wb_from_mem_out
   //mem_we_out
-  val mem_is_w=mem_pattern_out(2)
-  val mem_b_h =mem_pattern_out(1)
-  val mem_s_u =mem_pattern_out(0)
+  val mem_is_w=io.mem_pattern_out(2)
+  val mem_b_h =io.mem_pattern_out(1)
+  val mem_s_u =io.mem_pattern_out(0)
   //mem_addr_err
-  when(io.wb_from_mem_out|mem_we_out){//读内存或写内存
+  when(io.wb_from_mem_out|io.mem_we_out){//读内存或写内存
     when(mem_is_w&(io.mem_addr(1,0)=/=0.U)){//4字节,最低2位非0
       io.mem_addr_err:=true.B
     }.elsewhen((!mem_b_h)&(!io.mem_addr(0))){//2字节,最低位非0

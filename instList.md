@@ -67,6 +67,11 @@ csrrd   rd, csr_num
 csrwr   rd, csr_num
 csrxchg rd, rj, csr_num
 ```
+### 杂项指令
+```
+syscall code
+ertn 
+```
 
 # 例外和中断
 ## 例外表
