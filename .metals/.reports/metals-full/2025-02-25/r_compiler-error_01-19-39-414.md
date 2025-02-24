@@ -1,3 +1,16 @@
+file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/tool.scala
+### java.lang.IndexOutOfBoundsException: -1
+
+occurred in the presentation compiler.
+
+presentation compiler configuration:
+
+
+action parameters:
+offset: 21579
+uri: file:///D:/Code/VScode/chisel_LA32_cpu_design/src/main/scala/cpu/tool.scala
+text:
+```scala
 import chisel3._
 import chisel3.util._
 import chisel3.experimental._
@@ -189,11 +202,15 @@ class Inst_Frag_Decoder_pipline extends Module {
   val inst_csrrd  = op_31_26_d(0b00_0001)&(!io.op(25))&(!io.op(25))&rj0
   val inst_csrwr  = op_31_26_d(0b00_0001)&(!io.op(25))&(!io.op(25))&rj1
   val inst_csrxchg= op_31_26_d(0b00_0001)&(!io.op(25))&(!io.op(25))&(!rj0)&(!rj1)
+
+  val inst_ertn    = op_31_26_d(0b00_0001) & op_25_22_d(0b1001) & op_21_20_d(0b00) & op_19_15_d(0b1_0000) &(io.op(14,10)===0b01110.U(5.W))&rj0&(io.op(4,0)===0.U(5.W))
+  val inst_syscall = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b10) & op_19_15_d(0b1_0110)
   //指令不存在异常
-  io.cs.instNoExist = !(inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_nor|inst_pcaddu12i|inst_and|inst_or|inst_xor|inst_andi|inst_ori|inst_xori| 
+  io.cs.instNoExist := !(inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_nor|inst_pcaddu12i|inst_and|inst_or|inst_xor|inst_andi|inst_ori|inst_xori| 
                         inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_mod_w|inst_div_wu|inst_mod_wu|inst_addi_w|inst_lu12i_w|inst_slti|
                         inst_sltui|inst_sll_w|inst_srl_w|inst_sra_w|inst_slli_w|inst_srli_w|inst_srai_w|inst_bne|inst_blt|inst_bge|inst_bltu|
-                        inst_bgeu|inst_ld_b|inst_ld_h|inst_ld_w|inst_ld_bu|inst_ld_hu|inst_st_b|inst_st_h|inst_st_w)
+                        inst_bgeu|inst_ld_b|inst_ld_h|inst_ld_w|inst_ld_bu|inst_ld_hu|inst_st_b|inst_st_h|inst_st_w|
+                        inst_csrrd|inst_csrwr|inst_csrxchg|inst_ertn|inst_syscall)
   // 控制信号生成(新指令需要判断rf1和rf2的读取情况)
   io.cs.src_reg_is_rd := inst_beq | inst_bne | inst_st_w|inst_blt|inst_bltu|inst_bge|inst_bgeu|
                          inst_st_b| inst_st_h
@@ -447,45 +464,87 @@ class CSR extends Module{
     val csr_we = Input(Bool())
     val csr_wmask = Input(UInt(32.W))
     val csr_wvalue = Input(UInt(32.W))
+    val csr_ex_entry = Output(UInt(32.W))//异常处理入口地址
+    val csr_has_int = Output(Bool())//中断有效信号
+    val csr_ertn_flush = Input(Bool())//ERTN指令
+    val csr_wb_ex = Input(Bool())//触发异常处理
+    val csr_wb_ecode = Input(UInt(6.W))//例外类型一级编码
+    val csr_wb_esubcode = Input(UInt(9.W))//例外类型二级编码
   })
-  // 寄存器定义（全部初始化为0）
-  val CRMD   = RegInit(0.U(32.W))  // 0x0
-  val PRMD   = RegInit(0.U(32.W))  // 0x1
-  val ESTAT  = RegInit(0.U(32.W))  // 0x5
-  val ERA    = RegInit(0.U(32.W))  // 0x6
-  val EENTRY = RegInit(0.U(32.W))  // 0xc
-  val SAVE0  = RegInit(0.U(32.W))  // 0x30
-  val SAVE1  = RegInit(0.U(32.W))  // 0x31
-  val SAVE2  = RegInit(0.U(32.W))  // 0x32
-  val SAVE3  = RegInit(0.U(32.W))  // 0x33
+  //寄存器地址声明
+  val CRMD_ADDR = 0X0.W(@@)
+  //寄存器声明和初始化
+  //CRMD
+  val csr_crmd_plv = RegInit(0.U(2.W))
+  //PRMD
+  val csr_prmd_pplv = RegInit(0.U(2.W))
+  //CRMD(当前模式信息) 状态寄存器
+  //PLV域
+  when(io.csr_wb_ex){//触发例外置0
+    csr_crmd_plv:=0.U(2.W)
+  }.elsewhen(io.csr_ertn_flush){//ertn指令
+    //件将 CSR.PRMD 的 PPLV 域的值恢复到这里
+    csr_crmd_plv:=csr_prmd_pplv
+  }.elsewhen(io.csr_we&&(io.num===0.U)){//csr指令写入
 
-  // 读逻辑
-  io.csr_rvalue := 0.U
-  when(io.csr_re) {
-    switch(io.csr_num) {
-      is(0x0.U)  { io.csr_rvalue := CRMD }
-      is(0x1.U)  { io.csr_rvalue := PRMD }
-      is(0x5.U)  { io.csr_rvalue := ESTAT }
-      is(0x6.U)  { io.csr_rvalue := ERA }
-      is(0xc.U)  { io.csr_rvalue := EENTRY }
-      is(0x30.U) { io.csr_rvalue := SAVE0 }
-      is(0x31.U) { io.csr_rvalue := SAVE1 }
-      is(0x32.U) { io.csr_rvalue := SAVE2 }
-      is(0x33.U) { io.csr_rvalue := SAVE3 }
-    }
   }
-  // 写逻辑（带掩码功能）
-  when(io.csr_we) {
-    switch(io.csr_num) {
-      is(0x0.U)  { CRMD   := (CRMD   & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
-      is(0x1.U)  { PRMD   := (PRMD   & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
-      is(0x5.U)  { ESTAT  := (ESTAT  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
-      is(0x6.U)  { ERA    := (ERA    & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
-      is(0xc.U)  { EENTRY := (EENTRY & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
-      is(0x30.U) { SAVE0  := (SAVE0  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
-      is(0x31.U) { SAVE1  := (SAVE1  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
-      is(0x32.U) { SAVE2  := (SAVE2  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
-      is(0x33.U) { SAVE3  := (SAVE3  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
-    }
-  }
+  // // 寄存器定义（全部初始化为0）
+  // val CRMD   = RegInit(0.U(32.W))  // 0x0
+  // val PRMD   = RegInit(0.U(32.W))  // 0x1
+  // val ESTAT  = RegInit(0.U(32.W))  // 0x5
+  // val ERA    = RegInit(0.U(32.W))  // 0x6
+  // val EENTRY = RegInit(0.U(32.W))  // 0xc
+  // val SAVE0  = RegInit(0.U(32.W))  // 0x30
+  // val SAVE1  = RegInit(0.U(32.W))  // 0x31
+  // val SAVE2  = RegInit(0.U(32.W))  // 0x32
+  // val SAVE3  = RegInit(0.U(32.W))  // 0x33
+
+  // // 读逻辑
+  // io.csr_rvalue := 0.U
+  // when(io.csr_re) {
+  //   switch(io.csr_num) {
+  //     is(0x0.U)  { io.csr_rvalue := CRMD }
+  //     is(0x1.U)  { io.csr_rvalue := PRMD }
+  //     is(0x5.U)  { io.csr_rvalue := ESTAT }
+  //     is(0x6.U)  { io.csr_rvalue := ERA }
+  //     is(0xc.U)  { io.csr_rvalue := EENTRY }
+  //     is(0x30.U) { io.csr_rvalue := SAVE0 }
+  //     is(0x31.U) { io.csr_rvalue := SAVE1 }
+  //     is(0x32.U) { io.csr_rvalue := SAVE2 }
+  //     is(0x33.U) { io.csr_rvalue := SAVE3 }
+  //   }
+  // }
+  // // 写逻辑（带掩码功能）
+  // when(io.csr_we) {
+  //   switch(io.csr_num) {
+  //     is(0x0.U)  { CRMD   := (CRMD   & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+  //     is(0x1.U)  { PRMD   := (PRMD   & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+  //     is(0x5.U)  { ESTAT  := (ESTAT  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+  //     is(0x6.U)  { ERA    := (ERA    & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+  //     is(0xc.U)  { EENTRY := (EENTRY & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+  //     is(0x30.U) { SAVE0  := (SAVE0  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+  //     is(0x31.U) { SAVE1  := (SAVE1  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+  //     is(0x32.U) { SAVE2  := (SAVE2  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+  //     is(0x33.U) { SAVE3  := (SAVE3  & (~io.csr_wmask)) | (io.csr_wvalue & io.csr_wmask) }
+  //   }
+  // }
 }
+```
+
+
+
+#### Error stacktrace:
+
+```
+scala.collection.LinearSeqOps.apply(LinearSeq.scala:129)
+	scala.collection.LinearSeqOps.apply$(LinearSeq.scala:128)
+	scala.collection.immutable.List.apply(List.scala:79)
+	dotty.tools.dotc.util.Signatures$.applyCallInfo(Signatures.scala:244)
+	dotty.tools.dotc.util.Signatures$.computeSignatureHelp(Signatures.scala:101)
+	dotty.tools.dotc.util.Signatures$.signatureHelp(Signatures.scala:88)
+	dotty.tools.pc.SignatureHelpProvider$.signatureHelp(SignatureHelpProvider.scala:47)
+	dotty.tools.pc.ScalaPresentationCompiler.signatureHelp$$anonfun$1(ScalaPresentationCompiler.scala:422)
+```
+#### Short summary: 
+
+java.lang.IndexOutOfBoundsException: -1
