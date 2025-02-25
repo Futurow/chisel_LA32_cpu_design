@@ -107,8 +107,10 @@ class Inst_Frag_Decoder_pipline extends Module {
     val need_rf_raddr1    = Output(Bool())
     val need_rf_raddr2    = Output(Bool())
     val inst_cancel       = Output(Bool())
+    val wb_csr            = Output(Bool())
+    val csr_we            = Output(Bool())
     val instNoExist       = Output(Bool())
-}
+  }
   val io = IO(new Bundle {
     val op = Input(UInt(32.W))
     val rj_eq_rd = Input(Bool())
@@ -198,16 +200,19 @@ class Inst_Frag_Decoder_pipline extends Module {
                         inst_sltui|inst_sll_w|inst_srl_w|inst_sra_w|inst_slli_w|inst_srli_w|inst_srai_w|inst_bne|inst_blt|inst_bge|inst_bltu|
                         inst_bgeu|inst_ld_b|inst_ld_h|inst_ld_w|inst_ld_bu|inst_ld_hu|inst_st_b|inst_st_h|inst_st_w|
                         inst_csrrd|inst_csrwr|inst_csrxchg|inst_ertn|inst_syscall)
+  // csr指令相关信号
+  io.cs.wb_csr:=inst_csrrd|inst_csrwr
+  io.cs.csr_we:=inst_csrwr
   // 控制信号生成(新指令需要判断rf1和rf2的读取情况)
   io.cs.src_reg_is_rd := inst_beq | inst_bne | inst_st_w|inst_blt|inst_bltu|inst_bge|inst_bgeu|
-                         inst_st_b| inst_st_h
+                         inst_st_b| inst_st_h |inst_csrwr
   io.cs.w_addr_is_1 := inst_bl
   // io.cs.rf_we := !(inst_b | inst_beq | inst_bne | inst_st_w)
   io.cs.rf_we:=inst_add_w|inst_sub_w |inst_slt |inst_sltu |inst_nor |inst_and |inst_or |inst_xor |
                inst_addi_w|inst_pcaddu12i |inst_lu12i_w |inst_slli_w |inst_srli_w |inst_srai_w |inst_sll_w|inst_srl_w|inst_sra_w|
                inst_jirl |inst_bl |inst_ld_w |inst_slti|inst_sltui|inst_andi|inst_ori|inst_xori|
                inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu|
-               inst_ld_b|inst_ld_bu|inst_ld_h|inst_ld_hu
+               inst_ld_b|inst_ld_bu|inst_ld_h|inst_ld_hu|inst_csrrd|inst_csrwr
   // sel_src2独热码生成
   val src2_is_R_data2 = inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_nor|inst_and|inst_or|inst_xor|inst_sll_w|inst_srl_w|inst_sra_w|inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu
   val src2_is_ui12 = inst_andi|inst_ori|inst_xori
@@ -261,7 +266,7 @@ class Inst_Frag_Decoder_pipline extends Module {
   io.cs.need_rf_raddr2:=inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_and|inst_or|inst_nor|inst_xor|
                         inst_beq|inst_bne|inst_st_w|inst_sll_w|inst_srl_w|inst_sra_w|
                         inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu|
-                        inst_blt|inst_bltu|inst_bge|inst_bgeu|inst_st_b|inst_st_h
+                        inst_blt|inst_bltu|inst_bge|inst_bgeu|inst_st_b|inst_st_h|inst_csrwr
 
   io.cs.inst_cancel:=inst_jirl|inst_b|inst_bl|(inst_beq&&io.rj_eq_rd)|(inst_bne&&(!io.rj_eq_rd))|
                      (inst_blt&&io.rj_less_rd)|(inst_bltu&&io.rj_lessu_rd)|
@@ -374,22 +379,30 @@ class Block_Judge extends Module{
     val rf_rdata1 = Input(SInt(32.W))
     val rf_raddr2 = Input(UInt(5.W))
     val rf_rdata2 = Input(SInt(32.W))
+    val csr_num = Input(UInt(14.W))
     val exe_wb_from_mem = Input(Bool())
     val exe_rf_we = Input(Bool())
     val exe_rf_waddr = Input(UInt(5.W))
     val exe_alu_res = Input(SInt(32.W))
+    val exe_csr_num = Input(UInt(14.W))
+    val exe_csr_we = Input(Bool())
     val mem_rf_we = Input(Bool())
     val mem_rf_waddr = Input(UInt(5.W))
     val mem_wb_data = Input(SInt(32.W))
+    val mem_csr_num = Input(UInt(14.W))
+    val mem_csr_we = Input(Bool())
     val wb_rf_we = Input(Bool())
     val wb_rf_waddr = Input(UInt(5.W))
     val wb_wb_data = Input(SInt(32.W))
+    val wb_csr_num = Input(UInt(14.W))
+    val wb_csr_we = Input(Bool())
     val forward_rf_rdata1 =Output(SInt(32.W))
     val forward_rf_rdata2 =Output(SInt(32.W))
     val needBlock = Output(Bool())
   })
   val block_rf1 = Wire(Bool())
   val block_rf2 = Wire(Bool())
+  val csr_block = Wire(Bool())
   when(io.need_rf_raddr1){
     when(io.rf_raddr1=/=0.U){
       when(io.exe_rf_we&&(io.rf_raddr1===io.exe_rf_waddr)){
@@ -441,11 +454,20 @@ class Block_Judge extends Module{
   }.otherwise{
     io.forward_rf_rdata2:=io.rf_rdata2
     block_rf2:=false.B}
-  io.needBlock:=block_rf1||block_rf2
+  when(io.exe_csr_we&&(io.csr_num===io.exe_csr_num)){
+    csr_block:=true.B
+  }.elsewhen(io.mem_csr_we&&(io.csr_num===io.mem_csr_num)){
+    csr_block:=true.B
+  }.elsewhen(io.wb_csr_we&&(io.csr_num===io.wb_csr_num)){
+    csr_block:=true.B
+  }.otherwise{
+    csr_block:=false.B
+  }
+
+  io.needBlock:=block_rf1||block_rf2||csr_block
 }
 class CSR extends Module{
   val io = IO(new Bundle {
-    val csr_re = Input(Bool())
     val csr_num = Input(UInt(14.W))
     val csr_rvalue = Output(UInt(32.W))
     val csr_we = Input(Bool())
@@ -693,25 +715,23 @@ class CSR extends Module{
   val csr_tval_rval  =csr_tval_timeval
   val csr_ticlr_rval =Cat(0.U(31.W),csr_ticlr_clr)
   io.csr_rvalue := 0.U
-  when(io.csr_re) {
-    switch(io.csr_num) {
-      is(0X0.U)  { io.csr_rvalue := csr_crmd_rval  }          //CRMD_ADDR   = 0X0.U          (14.W)
-      is(0X1.U)  { io.csr_rvalue := csr_prmd_rval  }          //PRMD_ADDR   = 0X1.U          (14.W)
-      is(0X4.U)  { io.csr_rvalue := csr_ecfg_rval  }          //ECFG_ADDR   = 0X4.U          (14.W)
-      is(0X5.U)  { io.csr_rvalue := csr_estat_rval }          //ESTAT_ADDR  = 0X5.U          (14.W)
-      is(0X6.U)  { io.csr_rvalue := csr_era_rval   }          //ERA_ADDR    = 0X6.U          (14.W)
-      is(0X7.U)  { io.csr_rvalue := csr_badv_rval  }          //BADV_ADDR   = 0X7.U          (14.W)
-      is(0XC.U)  { io.csr_rvalue := csr_eentry_rval}          //EENTRY_ADDR = 0XC.U          (14.W)
-      is(0X20.U) { io.csr_rvalue := csr_cpuid_rval }         //CPUID_ADDR  = 0X20.U         (14.W)
-      is(0X30.U) { io.csr_rvalue := csr_save0_rval }         //SAVE0_ADDR  = 0X30.U         (14.W)
-      is(0X31.U) { io.csr_rvalue := csr_save1_rval }         //SAVE1_ADDR  = 0X31.U         (14.W)
-      is(0X32.U) { io.csr_rvalue := csr_save2_rval }         //SAVE2_ADDR  = 0X32.U         (14.W)
-      is(0X33.U) { io.csr_rvalue := csr_save3_rval }         //SAVE3_ADDR  = 0X33.U         (14.W)
-      is(0x40.U) { io.csr_rvalue := csr_tid_rval   }         //TID_ADDR    = 0x40.U         (14.W)
-      is(0x41.U) { io.csr_rvalue := csr_tcfg_rval  }         //TCFG_ADDR   = 0x41.U         (14.W)
-      is(0x42.U) { io.csr_rvalue := csr_tval_rval  }         //TVAL_ADDR   = 0x42.U         (14.W)
-      is(0X44.U) { io.csr_rvalue := csr_ticlr_rval }         //TICLR_ADDR  = 0X44.U         (14.W)
-    }
+  switch(io.csr_num) {
+    is(0X0.U)  { io.csr_rvalue := csr_crmd_rval  }          //CRMD_ADDR   = 0X0.U          (14.W)
+    is(0X1.U)  { io.csr_rvalue := csr_prmd_rval  }          //PRMD_ADDR   = 0X1.U          (14.W)
+    is(0X4.U)  { io.csr_rvalue := csr_ecfg_rval  }          //ECFG_ADDR   = 0X4.U          (14.W)
+    is(0X5.U)  { io.csr_rvalue := csr_estat_rval }          //ESTAT_ADDR  = 0X5.U          (14.W)
+    is(0X6.U)  { io.csr_rvalue := csr_era_rval   }          //ERA_ADDR    = 0X6.U          (14.W)
+    is(0X7.U)  { io.csr_rvalue := csr_badv_rval  }          //BADV_ADDR   = 0X7.U          (14.W)
+    is(0XC.U)  { io.csr_rvalue := csr_eentry_rval}          //EENTRY_ADDR = 0XC.U          (14.W)
+    is(0X20.U) { io.csr_rvalue := csr_cpuid_rval }         //CPUID_ADDR  = 0X20.U         (14.W)
+    is(0X30.U) { io.csr_rvalue := csr_save0_rval }         //SAVE0_ADDR  = 0X30.U         (14.W)
+    is(0X31.U) { io.csr_rvalue := csr_save1_rval }         //SAVE1_ADDR  = 0X31.U         (14.W)
+    is(0X32.U) { io.csr_rvalue := csr_save2_rval }         //SAVE2_ADDR  = 0X32.U         (14.W)
+    is(0X33.U) { io.csr_rvalue := csr_save3_rval }         //SAVE3_ADDR  = 0X33.U         (14.W)
+    is(0x40.U) { io.csr_rvalue := csr_tid_rval   }         //TID_ADDR    = 0x40.U         (14.W)
+    is(0x41.U) { io.csr_rvalue := csr_tcfg_rval  }         //TCFG_ADDR   = 0x41.U         (14.W)
+    is(0x42.U) { io.csr_rvalue := csr_tval_rval  }         //TVAL_ADDR   = 0x42.U         (14.W)
+    is(0X44.U) { io.csr_rvalue := csr_ticlr_rval }         //TICLR_ADDR  = 0X44.U         (14.W)
   }
   io.csr_ex_entry :=Cat(csr_eenrty_va,0.U(6.W))
   val csr_estat_is_12_0 = Cat(csr_estat_is_12,csr_estat_is_11,csr_estat_is_10,csr_estat_is_9_2,csr_estat_is_1_0)

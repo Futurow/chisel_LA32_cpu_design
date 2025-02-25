@@ -85,6 +85,9 @@ class ID_stage extends Module {
     val rf_raddr1 = Output(UInt(5.W))
     val rf_raddr2 = Output(UInt(5.W))
     val needBlock = Input(Bool())
+    val csr_num_out = Output(UInt(14.W))
+    val wb_csr_out = Output(Bool())
+    val csr_we_out = Output(Bool())
   })
   io.ready := true.B
   // io.ready:=true.B
@@ -134,7 +137,7 @@ class ID_stage extends Module {
   io.alu_op := inst_frag_decoder.io.cs.alu_op
   io.mul_op := inst_frag_decoder.io.cs.mul_op
   io.div_op := inst_frag_decoder.io.cs.div_op
-  io.mem_we := inst_frag_decoder.io.cs.mem_we 
+  io.mem_we := inst_frag_decoder.io.cs.mem_we&&io.valid
   io.mem_pattern:=inst_frag_decoder.io.cs.mem_pattern
   io.wb_from_mem := inst_frag_decoder.io.cs.wb_from_mem
   val sign_ext_offs26 = inst_frag_decoder.io.cs.sign_ext_offs26 //
@@ -177,6 +180,10 @@ class ID_stage extends Module {
     Cat(offs26, 0.U(2.W)).asSInt,
     Cat(offs16, 0.U(2.W)).asSInt
   )
+  //CSR相关信号
+  io.csr_num_out := inst(23,10)
+  io.wb_csr_out  := inst_frag_decoder.io.cs.wb_csr
+  io.csr_we_out  := inst_frag_decoder.io.cs.csr_we&&io.valid
 }
 class EXE_stage extends Module {
   val io = IO(new Bundle {
@@ -208,6 +215,12 @@ class EXE_stage extends Module {
     val pc_in = Input(UInt(32.W))
     val pc_out = Output(UInt(32.W))
     val mem_addr_err = Output(Bool())
+    val csr_num_in = Input(UInt(14.W))
+    val csr_num_out = Output(UInt(14.W))
+    val wb_csr_in = Input(Bool())
+    val wb_csr_out = Output(Bool())
+    val csr_we_in = Input(Bool())
+    val csr_we_out = Output(Bool())
   })
   val ready = Wire(Bool())
   io.ready := ready
@@ -228,6 +241,9 @@ class EXE_stage extends Module {
 
   val div_sign_ready = RegInit(false.B)
   val div_unsign_ready = RegInit(false.B)
+  val wb_csr = RegInit(false.B)
+  val csr_num = RegInit(UInt(14.W),0.U)
+  val csr_we = RegInit(false.B)
   when(io.pre_valid&&io.ready){
     valid := true.B
     pc := io.pc_in
@@ -246,6 +262,10 @@ class EXE_stage extends Module {
     rf_data2 := io.rf_data2
     div_sign_ready   := true.B
     div_unsign_ready := true.B
+
+    wb_csr:=io.wb_csr_in
+    csr_num:=io.csr_num_in
+    csr_we:=io.csr_we_in
   }.elsewhen(valid&&io.next_ready&&(~div_op(2))){//当是除法指令时阻塞
     valid := false.B
   }
@@ -298,6 +318,9 @@ class EXE_stage extends Module {
   val div_res_valid = Mux(div_sign_unsign,div_sign.io.m_axis_dout_tvalid,div_unsign.io.m_axis_dout_tvalid)
   ready:=(need_divmodule&div_res_valid)|(~need_divmodule)
   io.need_divmodule:=need_divmodule&(~div_res_valid)
+  io.wb_csr_out:=wb_csr
+  io.csr_num_out:=csr_num
+  io.csr_we_out:=csr_we&& valid
   //访存地址错误
   //wb_from_mem_out
   //mem_we_out
@@ -332,6 +355,14 @@ class MEM_stage extends Module {
     val wb_addr_out = Output(UInt(5.W))
     val pc_in = Input(UInt(32.W))
     val pc_out = Output(UInt(32.W))
+    val csr_num_in = Input(UInt(14.W))
+    val csr_num_out = Output(UInt(14.W))
+    val wb_csr_in = Input(Bool())
+    val wb_csr_out = Output(Bool())
+    val csr_we_in = Input(Bool())
+    val csr_we_out = Output(Bool())
+    val rd_data_in = Input(UInt(32.W))
+    val rd_data_out = Output(UInt(32.W))
   })
   io.ready := true.B
   val valid = RegInit(false.B)
@@ -342,6 +373,10 @@ class MEM_stage extends Module {
   val mem_pattern = RegInit(UInt(3.W), 0.U)
   val rf_we = RegInit(false.B)
   val wb_from_mem = RegInit(false.B)
+  val wb_csr = RegInit(false.B)
+  val csr_num = RegInit(UInt(14.W),0.U)
+  val rd_data = RegInit(UInt(32.W),0.U)
+  val csr_we = RegInit(false.B)
   when(io.pre_valid&&io.ready){
     valid := true.B
     pc := io.pc_in
@@ -351,6 +386,10 @@ class MEM_stage extends Module {
     wb_from_mem := io.wb_from_mem
     mem_byte_addr:=io.mem_byte_addr
     mem_pattern:=io.mem_pattern_in
+    wb_csr:=io.wb_csr_in
+    csr_num:=io.csr_num_in
+    rd_data:=io.rd_data_in
+    csr_we:=io.csr_we_in
   }.elsewhen(valid&&io.next_ready){
     valid:=false.B
   }
@@ -370,7 +409,10 @@ class MEM_stage extends Module {
   val mem_ext = Mux(mem_b_h,byte_ext,halfword_ext)
   val mem_res = Mux(mem_is_w,io.mem_value,mem_ext)
   io.wb_data := Mux(wb_from_mem, mem_res, alu_res)
-
+  io.wb_csr_out:=wb_csr
+  io.csr_num_out:=csr_num
+  io.rd_data_out:=rd_data
+  io.csr_we_out:=csr_we && valid
 }
 class WB_stage extends Module {
   val io = IO(new Bundle {
@@ -386,6 +428,12 @@ class WB_stage extends Module {
     val wb_addr_out = Output(UInt(5.W))
     val pc_in = Input(UInt(32.W))
     val pc_out = Output(UInt(32.W))
+    val csr_num_in = Input(UInt(14.W))
+    val csr_num_out = Output(UInt(14.W))
+    val wb_csr_in = Input(Bool())
+    val csr_we_in = Input(Bool())
+    val csr_we_out = Output(Bool())
+    val rd_data_in = Input(UInt(32.W))
   })
   io.ready := true.B
   val valid = RegInit(false.B)
@@ -393,21 +441,44 @@ class WB_stage extends Module {
   val wb_data = RegInit(SInt(32.W), 0.S)
   val wb_addr = RegInit(UInt(32.W), 0.U)
   val rf_we = RegInit(false.B)
+  val wb_csr = RegInit(false.B)
+  val csr_num = RegInit(UInt(14.W),0.U)
+  val rd_data = RegInit(UInt(32.W),0.U)
+  val csr_we = RegInit(false.B)
   when(io.pre_valid&&io.ready){
     valid := true.B
     pc := io.pc_in
     wb_data := io.wb_data_in
     wb_addr := io.wb_addr_in
     rf_we := io.rf_we_in
+    wb_csr:=io.wb_csr_in
+    csr_num:=io.csr_num_in
+    rd_data:=io.rd_data_in
+    csr_we:=io.csr_we_in
   }.elsewhen(valid&&io.next_ready){
     valid:=false.B
   }
   io.valid := valid
   io.pc_out := pc
+  val csr = Module(new CSR())
+  csr.io.csr_num := csr_num
+  csr.io.csr_we:=csr_we&&valid
+  csr.io.csr_wmask:=0.U(32.W)//*******
+  csr.io.csr_wvalue:=rd_data
+  csr.io.hw_int_in:=0.U(8.W)//8个硬中断暂时认为为0
+  csr.io.ipi_int_in:=0.U(1.W)//无核间中断
+  csr.io.wb_pc:=pc
+  csr.io.wb_vaddr:=0.U(32.W)//**********
+  csr.io.csr_ertn_flush:=false.B//**********
+  csr.io.csr_wb_ex:=false.B//**********
+  csr.io.csr_wb_ecode:=0.U(6.W)//**********
+  csr.io.csr_wb_esubcode:=0.U(9.W)//**********
 
-  io.wb_data_out := wb_data
+  io.wb_data_out := Mux(wb_csr,csr.io.csr_rvalue.asSInt,wb_data)
   io.wb_addr_out := wb_addr
   io.rf_we_out := rf_we&&valid
+  io.csr_num_out:=csr_num
+  io.csr_we_out:=csr_we&&valid
 
 }
 class minicpu_top_pipline extends Module {
@@ -469,6 +540,9 @@ class minicpu_top_pipline extends Module {
   exe_stage.io.rf_we_in := id_stage.io.rf_we_ID
   exe_stage.io.wb_addr_in := id_stage.io.wb_addr_out
   exe_stage.io.pc_in := id_stage.io.pc_out
+  exe_stage.io.csr_num_in:=id_stage.io.csr_num_out
+  exe_stage.io.wb_csr_in:=id_stage.io.wb_csr_out
+  exe_stage.io.csr_we_in:=id_stage.io.csr_we_out
   ////////////////
   // 访存阶段MEM_Stage
   ////////////////
@@ -508,6 +582,10 @@ class minicpu_top_pipline extends Module {
   mem_stage.io.rf_we_in := exe_stage.io.rf_we_out
   mem_stage.io.wb_addr_in := exe_stage.io.wb_addr_out
   mem_stage.io.pc_in := exe_stage.io.pc_out
+  mem_stage.io.csr_num_in:=exe_stage.io.csr_num_out
+  mem_stage.io.wb_csr_in:=exe_stage.io.wb_csr_out
+  mem_stage.io.csr_we_in:=exe_stage.io.csr_we_out
+  mem_stage.io.rd_data_in:=exe_stage.io.mem_data.asUInt
   ////////////////
   // 写回阶段WB_Stage
   ////////////////
@@ -517,11 +595,16 @@ class minicpu_top_pipline extends Module {
   wb_stage.io.rf_we_in := mem_stage.io.rf_we_out
   wb_stage.io.wb_addr_in := mem_stage.io.wb_addr_out
   wb_stage.io.pc_in := mem_stage.io.pc_out
+  wb_stage.io.csr_num_in:=mem_stage.io.csr_num_out
+  wb_stage.io.wb_csr_in:=mem_stage.io.wb_csr_out
+  wb_stage.io.csr_we_in:=mem_stage.io.csr_we_out 
+  wb_stage.io.rd_data_in:=mem_stage.io.rd_data_out
   val wb_rf_we = wb_stage.io.rf_we_out
   id_stage.io.rf_we_WB := wb_stage.io.rf_we_out
   id_stage.io.wb_data := wb_stage.io.wb_data_out
   id_stage.io.wb_addr_in := wb_stage.io.wb_addr_out
-
+  
+  //debug信号
   io.debug_wb_pc := wb_stage.io.pc_out
   io.debug_wb_rf_we := Cat(wb_rf_we, wb_rf_we, wb_rf_we, wb_rf_we)
   io.debug_wb_rf_wnum := wb_stage.io.wb_addr_out
@@ -549,17 +632,27 @@ class minicpu_top_pipline extends Module {
   block_judge.io.rf_rdata1:=id_stage.io.to_forward_rf_data1
   block_judge.io.rf_raddr2:=id_stage.io.rf_raddr2
   block_judge.io.rf_rdata2:=id_stage.io.to_forward_rf_data2
+  block_judge.io.csr_num:=id_stage.io.csr_num_out
 
   block_judge.io.exe_wb_from_mem:=exe_stage.io.wb_from_mem_out
   block_judge.io.exe_rf_we   :=exe_stage.io.rf_we_out
   block_judge.io.exe_rf_waddr:=exe_stage.io.wb_addr_out
   block_judge.io.exe_alu_res:=exe_stage.io.alu_res
+  block_judge.io.exe_csr_num:=exe_stage.io.csr_num_out
+  block_judge.io.exe_csr_we:=exe_stage.io.csr_we_out
+
   block_judge.io.mem_rf_we   :=mem_stage.io.rf_we_out
   block_judge.io.mem_rf_waddr:=mem_stage.io.wb_addr_out
   block_judge.io.mem_wb_data:=mem_stage.io.wb_data
+  block_judge.io.mem_csr_num:=mem_stage.io.csr_num_out
+  block_judge.io.mem_csr_we:=mem_stage.io.csr_we_out
+
   block_judge.io.wb_rf_we    :=wb_stage.io.rf_we_out
   block_judge.io.wb_rf_waddr :=wb_stage.io.wb_addr_out
   block_judge.io.wb_wb_data:=wb_stage.io.wb_data_out
+  block_judge.io.wb_csr_num:=wb_stage.io.csr_num_out
+  block_judge.io.wb_csr_we:=wb_stage.io.csr_we_out
+
   if_stage.io.needBlock:=block_judge.io.needBlock|exe_stage.io.need_divmodule
   id_stage.io.needBlock:=block_judge.io.needBlock|exe_stage.io.need_divmodule
   id_stage.io.forward_rf_rdata1:=block_judge.io.forward_rf_rdata1
