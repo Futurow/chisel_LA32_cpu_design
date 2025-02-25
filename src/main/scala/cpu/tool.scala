@@ -109,6 +109,7 @@ class Inst_Frag_Decoder_pipline extends Module {
     val inst_cancel       = Output(Bool())
     val wb_csr            = Output(Bool())
     val csr_we            = Output(Bool())
+    val csr_open_wmask    = Output(Bool())
     val instNoExist       = Output(Bool())
   }
   val io = IO(new Bundle {
@@ -201,18 +202,19 @@ class Inst_Frag_Decoder_pipline extends Module {
                         inst_bgeu|inst_ld_b|inst_ld_h|inst_ld_w|inst_ld_bu|inst_ld_hu|inst_st_b|inst_st_h|inst_st_w|
                         inst_csrrd|inst_csrwr|inst_csrxchg|inst_ertn|inst_syscall)
   // csr指令相关信号
-  io.cs.wb_csr:=inst_csrrd|inst_csrwr
-  io.cs.csr_we:=inst_csrwr
+  io.cs.wb_csr:=inst_csrrd|inst_csrwr|inst_csrxchg
+  io.cs.csr_we:=inst_csrwr|inst_csrxchg
+  io.cs.csr_open_wmask:=inst_csrxchg
   // 控制信号生成(新指令需要判断rf1和rf2的读取情况)
   io.cs.src_reg_is_rd := inst_beq | inst_bne | inst_st_w|inst_blt|inst_bltu|inst_bge|inst_bgeu|
-                         inst_st_b| inst_st_h |inst_csrwr
+                         inst_st_b| inst_st_h |inst_csrwr|inst_csrxchg
   io.cs.w_addr_is_1 := inst_bl
   // io.cs.rf_we := !(inst_b | inst_beq | inst_bne | inst_st_w)
   io.cs.rf_we:=inst_add_w|inst_sub_w |inst_slt |inst_sltu |inst_nor |inst_and |inst_or |inst_xor |
                inst_addi_w|inst_pcaddu12i |inst_lu12i_w |inst_slli_w |inst_srli_w |inst_srai_w |inst_sll_w|inst_srl_w|inst_sra_w|
                inst_jirl |inst_bl |inst_ld_w |inst_slti|inst_sltui|inst_andi|inst_ori|inst_xori|
                inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu|
-               inst_ld_b|inst_ld_bu|inst_ld_h|inst_ld_hu|inst_csrrd|inst_csrwr
+               inst_ld_b|inst_ld_bu|inst_ld_h|inst_ld_hu|inst_csrrd|inst_csrwr|inst_csrxchg
   // sel_src2独热码生成
   val src2_is_R_data2 = inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_nor|inst_and|inst_or|inst_xor|inst_sll_w|inst_srl_w|inst_sra_w|inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu
   val src2_is_ui12 = inst_andi|inst_ori|inst_xori
@@ -261,12 +263,12 @@ class Inst_Frag_Decoder_pipline extends Module {
                         inst_slti|inst_sltui|inst_andi|inst_ori|inst_xori|inst_sll_w|inst_srl_w|inst_sra_w|
                         inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu|
                         inst_blt|inst_bltu|inst_bge|inst_bgeu|
-                        inst_ld_b|inst_ld_bu|inst_ld_h|inst_ld_hu|inst_st_b|inst_st_h
+                        inst_ld_b|inst_ld_bu|inst_ld_h|inst_ld_hu|inst_st_b|inst_st_h|inst_csrxchg
 
   io.cs.need_rf_raddr2:=inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_and|inst_or|inst_nor|inst_xor|
                         inst_beq|inst_bne|inst_st_w|inst_sll_w|inst_srl_w|inst_sra_w|
                         inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu|
-                        inst_blt|inst_bltu|inst_bge|inst_bgeu|inst_st_b|inst_st_h|inst_csrwr
+                        inst_blt|inst_bltu|inst_bge|inst_bgeu|inst_st_b|inst_st_h|inst_csrwr|inst_csrxchg
 
   io.cs.inst_cancel:=inst_jirl|inst_b|inst_bl|(inst_beq&&io.rj_eq_rd)|(inst_bne&&(!io.rj_eq_rd))|
                      (inst_blt&&io.rj_less_rd)|(inst_bltu&&io.rj_lessu_rd)|
@@ -513,7 +515,7 @@ class CSR extends Module{
   //CRMD
   val csr_crmd_plv = RegInit(0.U(2.W))
   val csr_crmd_ie  = RegInit(0.U(1.W))
-  val csr_crmd_da  = RegInit(0.U(1.W))
+  val csr_crmd_da  = RegInit(1.U(1.W))
   val csr_crmd_pg  = RegInit(0.U(1.W))
   val csr_crmd_datf= RegInit(0.U(2.W))
   val csr_crmd_datm= RegInit(0.U(2.W))
