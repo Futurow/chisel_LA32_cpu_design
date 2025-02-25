@@ -633,6 +633,7 @@ class minicpu_top_pipline extends Module {
   block_judge.io.rf_raddr2:=id_stage.io.rf_raddr2
   block_judge.io.rf_rdata2:=id_stage.io.to_forward_rf_data2
   block_judge.io.csr_num:=id_stage.io.csr_num_out
+  block_judge.io.csr_read:=id_stage.io.wb_csr_out
 
   block_judge.io.exe_wb_from_mem:=exe_stage.io.wb_from_mem_out
   block_judge.io.exe_rf_we   :=exe_stage.io.rf_we_out
