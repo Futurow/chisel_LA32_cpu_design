@@ -88,6 +88,7 @@ class ID_stage extends Module {
     val csr_num_out = Output(UInt(14.W))
     val wb_csr_out = Output(Bool())
     val csr_we_out = Output(Bool())
+    val csr_open_wmask_out = Output(Bool())
   })
   io.ready := true.B
   // io.ready:=true.B
@@ -184,6 +185,7 @@ class ID_stage extends Module {
   io.csr_num_out := inst(23,10)
   io.wb_csr_out  := inst_frag_decoder.io.cs.wb_csr
   io.csr_we_out  := inst_frag_decoder.io.cs.csr_we&&io.valid
+  io.csr_open_wmask_out := inst_frag_decoder.io.cs.csr_open_wmask
 }
 class EXE_stage extends Module {
   val io = IO(new Bundle {
@@ -221,6 +223,9 @@ class EXE_stage extends Module {
     val wb_csr_out = Output(Bool())
     val csr_we_in = Input(Bool())
     val csr_we_out = Output(Bool())
+    val csr_wmask_out=Output(UInt(32.W))
+    val csr_open_wmask_in = Input(Bool())
+    val csr_open_wmask_out= Output(Bool())
   })
   val ready = Wire(Bool())
   io.ready := ready
@@ -244,6 +249,8 @@ class EXE_stage extends Module {
   val wb_csr = RegInit(false.B)
   val csr_num = RegInit(UInt(14.W),0.U)
   val csr_we = RegInit(false.B)
+  val csr_wmask = RegInit(UInt(32.W), 0.U)
+  val csr_open_wmask = RegInit(false.B)
   when(io.pre_valid&&io.ready){
     valid := true.B
     pc := io.pc_in
@@ -266,6 +273,7 @@ class EXE_stage extends Module {
     wb_csr:=io.wb_csr_in
     csr_num:=io.csr_num_in
     csr_we:=io.csr_we_in
+    csr_open_wmask:=io.csr_open_wmask_in
   }.elsewhen(valid&&io.next_ready&&(~div_op(2))){//当是除法指令时阻塞
     valid := false.B
   }
@@ -321,6 +329,8 @@ class EXE_stage extends Module {
   io.wb_csr_out:=wb_csr
   io.csr_num_out:=csr_num
   io.csr_we_out:=csr_we&& valid
+  io.csr_wmask_out:=src1.asUInt
+  io.csr_open_wmask_out:=csr_open_wmask
   //访存地址错误
   //wb_from_mem_out
   //mem_we_out
@@ -363,6 +373,10 @@ class MEM_stage extends Module {
     val csr_we_out = Output(Bool())
     val rd_data_in = Input(UInt(32.W))
     val rd_data_out = Output(UInt(32.W))
+    val csr_wmask_in =Input(UInt(32.W))
+    val csr_wmask_out=Output(UInt(32.W))
+    val csr_open_wmask_in = Input(Bool())
+    val csr_open_wmask_out= Output(Bool())
   })
   io.ready := true.B
   val valid = RegInit(false.B)
@@ -377,6 +391,8 @@ class MEM_stage extends Module {
   val csr_num = RegInit(UInt(14.W),0.U)
   val rd_data = RegInit(UInt(32.W),0.U)
   val csr_we = RegInit(false.B)
+  val csr_wmask = RegInit(UInt(32.W), 0.U)
+  val csr_open_wmask = RegInit(false.B)
   when(io.pre_valid&&io.ready){
     valid := true.B
     pc := io.pc_in
@@ -390,6 +406,8 @@ class MEM_stage extends Module {
     csr_num:=io.csr_num_in
     rd_data:=io.rd_data_in
     csr_we:=io.csr_we_in
+    csr_wmask:=io.csr_wmask_in
+    csr_open_wmask:=io.csr_open_wmask_in
   }.elsewhen(valid&&io.next_ready){
     valid:=false.B
   }
@@ -413,6 +431,8 @@ class MEM_stage extends Module {
   io.csr_num_out:=csr_num
   io.rd_data_out:=rd_data
   io.csr_we_out:=csr_we && valid
+  io.csr_wmask_out:=csr_wmask
+  io.csr_open_wmask_out:=csr_open_wmask
 }
 class WB_stage extends Module {
   val io = IO(new Bundle {
@@ -434,6 +454,8 @@ class WB_stage extends Module {
     val csr_we_in = Input(Bool())
     val csr_we_out = Output(Bool())
     val rd_data_in = Input(UInt(32.W))
+    val csr_wmask_in=Input(UInt(32.W))
+    val csr_open_wmask_in = Input(Bool())
   })
   io.ready := true.B
   val valid = RegInit(false.B)
@@ -445,6 +467,8 @@ class WB_stage extends Module {
   val csr_num = RegInit(UInt(14.W),0.U)
   val rd_data = RegInit(UInt(32.W),0.U)
   val csr_we = RegInit(false.B)
+  val csr_wmask = RegInit(UInt(32.W), 0.U)
+  val csr_open_wmask = RegInit(false.B)
   when(io.pre_valid&&io.ready){
     valid := true.B
     pc := io.pc_in
@@ -455,6 +479,8 @@ class WB_stage extends Module {
     csr_num:=io.csr_num_in
     rd_data:=io.rd_data_in
     csr_we:=io.csr_we_in
+    csr_wmask:=io.csr_wmask_in
+    csr_open_wmask:=io.csr_open_wmask_in
   }.elsewhen(valid&&io.next_ready){
     valid:=false.B
   }
@@ -463,7 +489,7 @@ class WB_stage extends Module {
   val csr = Module(new CSR())
   csr.io.csr_num := csr_num
   csr.io.csr_we:=csr_we&&valid
-  csr.io.csr_wmask:=0.U(32.W)//*******
+  csr.io.csr_wmask:=Mux(csr_open_wmask,csr_wmask,0xffffffffL.U(32.W))
   csr.io.csr_wvalue:=rd_data
   csr.io.hw_int_in:=0.U(8.W)//8个硬中断暂时认为为0
   csr.io.ipi_int_in:=0.U(1.W)//无核间中断
@@ -543,6 +569,7 @@ class minicpu_top_pipline extends Module {
   exe_stage.io.csr_num_in:=id_stage.io.csr_num_out
   exe_stage.io.wb_csr_in:=id_stage.io.wb_csr_out
   exe_stage.io.csr_we_in:=id_stage.io.csr_we_out
+  exe_stage.io.csr_open_wmask_in:=id_stage.io.csr_open_wmask_out
   ////////////////
   // 访存阶段MEM_Stage
   ////////////////
@@ -586,6 +613,8 @@ class minicpu_top_pipline extends Module {
   mem_stage.io.wb_csr_in:=exe_stage.io.wb_csr_out
   mem_stage.io.csr_we_in:=exe_stage.io.csr_we_out
   mem_stage.io.rd_data_in:=exe_stage.io.mem_data.asUInt
+  mem_stage.io.csr_wmask_in:=exe_stage.io.csr_wmask_out
+  mem_stage.io.csr_open_wmask_in:=exe_stage.io.csr_open_wmask_out
   ////////////////
   // 写回阶段WB_Stage
   ////////////////
@@ -599,6 +628,8 @@ class minicpu_top_pipline extends Module {
   wb_stage.io.wb_csr_in:=mem_stage.io.wb_csr_out
   wb_stage.io.csr_we_in:=mem_stage.io.csr_we_out 
   wb_stage.io.rd_data_in:=mem_stage.io.rd_data_out
+  wb_stage.io.csr_wmask_in:=mem_stage.io.csr_wmask_out
+  wb_stage.io.csr_open_wmask_in:=mem_stage.io.csr_open_wmask_out
   val wb_rf_we = wb_stage.io.rf_we_out
   id_stage.io.rf_we_WB := wb_stage.io.rf_we_out
   id_stage.io.wb_data := wb_stage.io.wb_data_out
