@@ -379,6 +379,7 @@ class Block_Judge extends Module{
     val rf_rdata1 = Input(SInt(32.W))
     val rf_raddr2 = Input(UInt(5.W))
     val rf_rdata2 = Input(SInt(32.W))
+    val csr_read= Input(Bool())
     val csr_num = Input(UInt(14.W))
     val exe_wb_from_mem = Input(Bool())
     val exe_rf_we = Input(Bool())
@@ -454,12 +455,17 @@ class Block_Judge extends Module{
   }.otherwise{
     io.forward_rf_rdata2:=io.rf_rdata2
     block_rf2:=false.B}
-  when(io.exe_csr_we&&(io.csr_num===io.exe_csr_num)){
-    csr_block:=true.B
-  }.elsewhen(io.mem_csr_we&&(io.csr_num===io.mem_csr_num)){
-    csr_block:=true.B
-  }.elsewhen(io.wb_csr_we&&(io.csr_num===io.wb_csr_num)){
-    csr_block:=true.B
+  //csr读后写
+  when(io.csr_read){
+    when(io.exe_csr_we&&(io.csr_num===io.exe_csr_num)){
+      csr_block:=true.B
+    }.elsewhen(io.mem_csr_we&&(io.csr_num===io.mem_csr_num)){
+      csr_block:=true.B
+    }.elsewhen(io.wb_csr_we&&(io.csr_num===io.wb_csr_num)){
+      csr_block:=true.B
+    }.otherwise{
+      csr_block:=false.B
+    }
   }.otherwise{
     csr_block:=false.B
   }
