@@ -5,8 +5,8 @@ object res extends App {
   // emitVerilog(new minicpu_top_5inst(), Array("--target-dir", "generated"))
   // emitVerilog(new RegFile(), Array("--target-dir", "generated"))
   // emitVerilog(new Inst_Frag_Decoder(), Array("--target-dir", "generated"))
-  val local = false
-  // val local = true
+  // val local = false
+  val local = true
   if(local){
   emitVerilog(
     new minicpu_top_pipline(),
