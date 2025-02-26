@@ -71,6 +71,9 @@ csrxchg rd, rj, csr_num
 ```
 syscall code
 ertn 
+rdcntvl.w rd
+rdcntvh.w rd
+rdcntid   rj
 ```
 
 # 例外和中断

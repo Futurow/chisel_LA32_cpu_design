@@ -110,9 +110,12 @@ class Inst_Frag_Decoder_pipline extends Module {
     val wb_csr            = Output(Bool())
     val csr_we            = Output(Bool())
     val csr_open_wmask    = Output(Bool())
+    val ex_break          = Output(Bool())
     val ex_syscall        = Output(Bool())
     val ertn_flush        = Output(Bool())
     val instNoExist       = Output(Bool())
+    val cntcontrol        = Output(UInt(3.W))
+    val wb_waddr_is_rj    = Output(Bool())
   }
   val io = IO(new Bundle {
     val op = Input(UInt(32.W))
@@ -196,16 +199,30 @@ class Inst_Frag_Decoder_pipline extends Module {
   val inst_csrxchg= op_31_26_d(0b00_0001)&(!io.op(25))&(!io.op(25))&(!rj0)&(!rj1)
 
   val inst_ertn    = op_31_26_d(0b00_0001) & op_25_22_d(0b1001) & op_21_20_d(0b00) & op_19_15_d(0b1_0000) &(io.op(14,10)===0b01110.U(5.W))&rj0&(io.op(4,0)===0.U(5.W))
+  val inst_break   = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b10) & op_19_15_d(0b1_0100)
   val inst_syscall = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b10) & op_19_15_d(0b1_0110)
+
+  val inst_rdcntid   = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b00) & op_19_15_d(0b0_0000)&(io.op(14,10)===0b11000.U(5.W))&(io.op(4,0)===0.U(5.W))
+  val inst_rdcntvl_w = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b00) & op_19_15_d(0b0_0000)&(io.op(14,10)===0b11000.U(5.W))&rj0
+  val inst_rdcntvh_w = op_31_26_d(0b00_0000) & op_25_22_d(0b0000) & op_21_20_d(0b00) & op_19_15_d(0b0_0000)&(io.op(14,10)===0b11001.U(5.W))&rj0
+  
   //系统调用syscall例外
+  io.cs.ex_break  :=inst_break
   io.cs.ex_syscall:=inst_syscall
   io.cs.ertn_flush:=inst_ertn
+  //计时器指令
+  val time_counter_l_h=inst_rdcntvl_w
+  val timecnt_tid=inst_rdcntvl_w|inst_rdcntvh_w
+  val wb_wdata_timeabout = inst_rdcntvl_w|inst_rdcntvh_w|inst_rdcntid
+  io.cs.cntcontrol:=Cat(time_counter_l_h,timecnt_tid,wb_wdata_timeabout)
+  io.cs.wb_waddr_is_rj:=inst_rdcntid
   //指令不存在异常
   io.cs.instNoExist := !(inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_nor|inst_pcaddu12i|inst_and|inst_or|inst_xor|inst_andi|inst_ori|inst_xori| 
                         inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_mod_w|inst_div_wu|inst_mod_wu|inst_addi_w|inst_lu12i_w|inst_slti|
                         inst_sltui|inst_sll_w|inst_srl_w|inst_sra_w|inst_slli_w|inst_srli_w|inst_srai_w|inst_bne|inst_blt|inst_bge|inst_bltu|
                         inst_bgeu|inst_ld_b|inst_ld_h|inst_ld_w|inst_ld_bu|inst_ld_hu|inst_st_b|inst_st_h|inst_st_w|
-                        inst_csrrd|inst_csrwr|inst_csrxchg|inst_ertn|inst_syscall)
+                        inst_csrrd|inst_csrwr|inst_csrxchg|inst_ertn|inst_syscall|inst_break|
+                        inst_rdcntid|inst_rdcntvl_w|inst_rdcntvh_w)
   // csr指令相关信号
   io.cs.wb_csr:=inst_csrrd|inst_csrwr|inst_csrxchg
   io.cs.csr_we:=inst_csrwr|inst_csrxchg
@@ -219,7 +236,8 @@ class Inst_Frag_Decoder_pipline extends Module {
                inst_addi_w|inst_pcaddu12i |inst_lu12i_w |inst_slli_w |inst_srli_w |inst_srai_w |inst_sll_w|inst_srl_w|inst_sra_w|
                inst_jirl |inst_bl |inst_ld_w |inst_slti|inst_sltui|inst_andi|inst_ori|inst_xori|
                inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu|
-               inst_ld_b|inst_ld_bu|inst_ld_h|inst_ld_hu|inst_csrrd|inst_csrwr|inst_csrxchg
+               inst_ld_b|inst_ld_bu|inst_ld_h|inst_ld_hu|inst_csrrd|inst_csrwr|inst_csrxchg|
+               inst_rdcntid|inst_rdcntvl_w|inst_rdcntvh_w
   // sel_src2独热码生成
   val src2_is_R_data2 = inst_add_w|inst_sub_w|inst_slt|inst_sltu|inst_nor|inst_and|inst_or|inst_xor|inst_sll_w|inst_srl_w|inst_sra_w|inst_mul_w|inst_mulh_w|inst_mulh_wu|inst_div_w|inst_div_wu|inst_mod_w|inst_mod_wu
   val src2_is_ui12 = inst_andi|inst_ori|inst_xori
@@ -391,10 +409,12 @@ class Block_Judge extends Module{
     val exe_rf_waddr = Input(UInt(5.W))
     val exe_wb_csr = Input(Bool())
     val exe_alu_res = Input(SInt(32.W))
+    val exe_rtime = Input(Bool())
     val mem_rf_we = Input(Bool())
     val mem_rf_waddr = Input(UInt(5.W))
     val mem_wb_data = Input(SInt(32.W))
     val mem_wb_csr = Input(Bool())
+    val mem_rtime = Input(Bool())
     val wb_rf_we = Input(Bool())
     val wb_rf_waddr = Input(UInt(5.W))
     val wb_wb_data = Input(SInt(32.W))
@@ -417,11 +437,11 @@ class Block_Judge extends Module{
             block_rf1:=false.B
             io.forward_rf_rdata1:=io.exe_alu_res
            }
-           csr_block1:=io.exe_wb_csr
+           csr_block1:=io.exe_wb_csr|io.exe_rtime
       }.elsewhen(io.mem_rf_we&&(io.rf_raddr1===io.mem_rf_waddr)){
         block_rf1:=false.B
         io.forward_rf_rdata1:=io.mem_wb_data
-        csr_block1:=io.mem_wb_csr
+        csr_block1:=io.mem_wb_csr|io.mem_rtime
       }.elsewhen(io.wb_rf_we&&(io.rf_raddr1===io.wb_rf_waddr)){
         block_rf1:=false.B
         io.forward_rf_rdata1:=io.wb_wb_data
@@ -449,11 +469,11 @@ class Block_Judge extends Module{
             block_rf2:=false.B
             io.forward_rf_rdata2:=io.exe_alu_res
            }
-           csr_block2:=io.exe_wb_csr
+           csr_block2:=io.exe_wb_csr|io.exe_rtime
       }.elsewhen(io.mem_rf_we&&(io.rf_raddr2===io.mem_rf_waddr)){
         block_rf2:=false.B
         io.forward_rf_rdata2:=io.mem_wb_data
-        csr_block2:=io.mem_wb_csr
+        csr_block2:=io.mem_wb_csr|io.mem_rtime
       }.elsewhen(io.wb_rf_we&&(io.rf_raddr2===io.wb_rf_waddr)){
         block_rf2:=false.B
         io.forward_rf_rdata2:=io.wb_wb_data
@@ -482,8 +502,8 @@ class CSR extends Module{
     val csr_wvalue = Input(UInt(32.W))
     val hw_int_in  = Input(UInt(8.W))//8个硬中断
     val ipi_int_in = Input(UInt(1.W))
-    val wb_pc      = Input(UInt(32.W))
-    val wb_vaddr   = Input(UInt(32.W))
+    val ex_pc      = Input(UInt(32.W))
+    val ex_vaddr   = Input(UInt(32.W))
     val csr_ex_entry = Output(UInt(32.W))//异常处理入口地址
     val csr_era      = Output(UInt(32.W))//例外返回地址
     val csr_has_int = Output(Bool())//中断有效信号
@@ -631,7 +651,7 @@ class CSR extends Module{
   //ERA(例外返回地址)状态寄存器///
   ////////////////////////////
   when(io.csr_wb_ex){//触发例外
-    csr_era := io.wb_pc
+    csr_era := io.ex_pc
   }.elsewhen(io.csr_we&&(io.csr_num===ERA_ADDR)){
     csr_era := ( io.csr_wmask&io.csr_wvalue)|
                (~io.csr_wmask&csr_era)
@@ -645,7 +665,7 @@ class CSR extends Module{
   val ALE_ERR  = io.csr_wb_ecode===0x9.U//地址非对齐例外
   val ex_addr_err = ADE_ERR||ALE_ERR
   when(io.csr_wb_ex&&ex_addr_err){
-    csr_badv:=Mux(ADE_ERR&&ADEF_ERR,io.wb_pc,io.wb_vaddr)
+    csr_badv:=Mux(ADE_ERR&&ADEF_ERR,io.ex_pc,io.ex_vaddr)
   }
 
   ////////////////////////////////
