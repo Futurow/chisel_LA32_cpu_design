@@ -51,7 +51,7 @@ class IF_stage extends Module {
   io.inst := io.inst_sram_rdata
   io.pc:=inst_pc
   //最低两位为0
-  val inst_fetch_addr_err =io.inst_sram_rdata(1)|io.inst_sram_rdata(0)
+  val inst_fetch_addr_err =io.inst_sram_addr(1,0)=/=0.U(2.W)
   when(inst_fetch_addr_err){//取值地址错例外
     io.exception_out:=Cat(1.U(1.W),0x8.U(6.W),0.U(1.W))
   }.otherwise{
@@ -98,11 +98,12 @@ class ID_stage extends Module {
     val wb_csr_out = Output(Bool())
     val csr_we_out = Output(Bool())
     val csr_open_wmask_out = Output(Bool())
+    val csr_has_int = Input(Bool())
     val exception_in = Input(UInt(8.W))//has_ex,ex_ecode,ex_esubcode
     val exception_out = Output(UInt(8.W))
     val ertn_flush_out = Output(Bool())
-    val cntcontrol_out = Output(UInt(3.W))
     val clear = Input(Bool())
+    val cntcontrol_out = Output(UInt(3.W))
   })
   io.ready := true.B
   // io.ready:=true.B
@@ -212,8 +213,10 @@ class ID_stage extends Module {
       io.exception_out:=Cat(1.U(1.W),0xD.U(6.W),0.U(1.W))
     }.elsewhen((~exception(7))&&inst_frag_decoder.io.cs.ex_break){//BRK断点例外
       io.exception_out:=Cat(1.U(1.W),0xC.U(6.W),0.U(1.W))
-    }.elsewhen((~exception(7))&&inst_frag_decoder.io.cs.ex_syscall){//系统调用例外
+    }.elsewhen((~exception(7))&&inst_frag_decoder.io.cs.ex_syscall){//SYS系统调用例外
       io.exception_out:=Cat(1.U(1.W),0xB.U(6.W),0.U(1.W))
+    }.elsewhen((~exception(7))&&io.csr_has_int){//INT中断
+      io.exception_out:=Cat(1.U(1.W),0x0.U(6.W),0.U(1.W))
     }.otherwise{
       io.exception_out:=exception
     }
@@ -264,9 +267,9 @@ class EXE_stage extends Module {
     val exception_out = Output(UInt(8.W))
     val ertn_flush_in = Input(Bool())
     val ertn_flush_out = Output(Bool())
+    val clear = Input(Bool())
     val cntcontrol_in = Input(UInt(3.W))
     val cntcontrol_out = Output(UInt(3.W))
-    val clear = Input(Bool())
   })
   val ready = Wire(Bool())
   io.ready := ready
@@ -294,7 +297,7 @@ class EXE_stage extends Module {
   val csr_open_wmask = RegInit(false.B)
   val exception = RegInit(UInt(8.W), 0.U)
   val ertn_flush = RegInit(false.B)
-  val cntcontrol=RegInit(UInt(3.W),0.U)
+  val cntcontrol = RegInit(UInt(3.W), 0.U)
   when(io.clear){
     valid:=false.B
   }
@@ -333,7 +336,7 @@ class EXE_stage extends Module {
   io.wb_addr_out := wb_addr
 
 
-  io.mem_we_out := mem_we && valid 
+  io.mem_we_out := mem_we && valid && (~io.exception_out(7))//需要无异常
   io.mem_pattern_out := mem_pattern
   io.wb_from_mem_out := wb_from_mem
   io.rf_we_out := rf_we && valid
@@ -403,10 +406,10 @@ class EXE_stage extends Module {
   val mem_b_h =io.mem_pattern_out(1)
   val mem_s_u =io.mem_pattern_out(0)
   //mem_addr_err地址非对齐
-  when(io.wb_from_mem_out|io.mem_we_out){//读内存或写内存
+  when(io.valid&&(io.wb_from_mem_out|mem_we)){//读内存或写内存
     when(mem_is_w&(io.mem_addr(1,0)=/=0.U)){//4字节,最低2位非0
       mem_addr_err:=true.B
-    }.elsewhen((!mem_b_h)&(!io.mem_addr(0))){//2字节,最低位非0
+    }.elsewhen((!mem_b_h)&io.mem_addr(0)){//2字节,最低位非0
       mem_addr_err:=true.B
     }.otherwise{mem_addr_err:=false.B}
   }.otherwise{mem_addr_err:=false.B}
@@ -448,9 +451,9 @@ class MEM_stage extends Module {
     val exception_out = Output(UInt(8.W))
     val ertn_flush_in = Input(Bool())
     val ertn_flush_out = Output(Bool())
+    val clear = Input(Bool())
     val cntcontrol_in = Input(UInt(3.W))
     val cntcontrol_out = Output(UInt(3.W))
-    val clear = Input(Bool())
   })
   io.ready := true.B
   val valid = RegInit(false.B)
@@ -469,8 +472,8 @@ class MEM_stage extends Module {
   val csr_open_wmask = RegInit(false.B)
   val ex_vaddr = RegInit(UInt(32.W), 0.U)
   val exception = RegInit(UInt(8.W), 0.U)
-  val cntcontrol=RegInit(UInt(3.W),0.U)
   val ertn_flush=RegInit(false.B)
+  val cntcontrol = RegInit(UInt(3.W), 0.U)
   when(io.clear){
     valid:=false.B
   }.elsewhen(io.pre_valid&&io.ready){
@@ -548,6 +551,7 @@ class WB_stage extends Module {
     val wb_csr_out = Output(Bool())
     val csr_we_in = Input(Bool())
     val csr_we_out = Output(Bool())
+    val csr_has_int = Output(Bool())
     val rd_data_in = Input(UInt(32.W))
     val csr_wmask_in=Input(UInt(32.W))
     val csr_open_wmask_in = Input(Bool())
@@ -558,14 +562,13 @@ class WB_stage extends Module {
     val csr_pc = Output(UInt(32.W))
     val ertn_flush_in = Input(Bool())
     val ertn_flush_out = Output(Bool())
-    val cntcontrol_in = Input(UInt(3.W))
     val clear = Input(Bool())
+    val cntcontrol_in = Input(UInt(3.W))
+    val cntcontrol_out = Output(UInt(3.W))
   })
   //计时器
-  val counter_id = RegInit(UInt(32.W), 0.U)
   val stable_counter = RegInit(UInt(64.W), 0.U)
   stable_counter:=stable_counter+1.U
-
   io.ready := true.B
   val valid = RegInit(false.B)
   val pc = RegInit(UInt(32.W), 0.U)
@@ -619,19 +622,19 @@ class WB_stage extends Module {
   csr.io.csr_wb_ex:=exception(7)&&valid
   csr.io.csr_wb_ecode:=exception(6,1)
   csr.io.csr_wb_esubcode:=Cat(0.U(8.W),exception(0))
-
-  // stable_counter
-  //io.cs.cntcontrol:=Cat(time_counter_l_h,timecnt_tid,wb_wdata_timeabout)
-  val timecnt_data = Mux(cntcontrol(2),stable_counter(31,0),stable_counter(63,32))
-  val id_or_timedata = Mux(cntcontrol(1),counter_id,timecnt_data)
-  io.wb_data_out := Mux(wb_csr,csr.io.csr_rvalue.asSInt,Mux(cntcontrol(0),id_or_timedata.asSInt,wb_data))
+  //io.cs.cntcontrol:=Cat(time_counter_l_h,timecnt_tid,wb_about_timedata)
+  val timelh = Mux(cntcontrol(2),stable_counter(31,0),stable_counter(63,32))
+  val timedata = Mux(cntcontrol(1),timelh,csr.io.csr_tid)
+  io.wb_data_out := Mux(wb_csr,csr.io.csr_rvalue.asSInt,Mux(cntcontrol(0),timedata.asSInt,wb_data))
   io.wb_addr_out := wb_addr
-  io.rf_we_out := rf_we&&valid
+  io.rf_we_out := rf_we&&valid&&(~exception(7))
   io.csr_num_out:=csr_num
-  io.csr_we_out:=csr_we&&valid
+  io.csr_we_out:=csr_we&&valid&&(~exception(7))
   io.wb_csr_out:=wb_csr
+  io.csr_has_int:=csr.io.csr_has_int
   io.clearpipline:=(exception(7)|ertn_flush)&&valid//例外或者ertn清空流水线
   io.ertn_flush_out:=ertn_flush&&io.valid
+  io.cntcontrol_out:=cntcontrol
   io.csr_pc:=Mux(io.ertn_flush_out,csr.io.csr_era,csr.io.csr_ex_entry)
   //例外
   when(io.valid){
@@ -680,6 +683,7 @@ class minicpu_top_pipline extends Module {
   id_stage.io.pre_valid := if_stage.io.valid
   id_stage.io.inst := if_stage.io.inst
   id_stage.io.pc_in := if_stage.io.pc
+  id_stage.io.csr_has_int:=wb_stage.io.csr_has_int
   id_stage.io.exception_in:=if_stage.io.exception_out
   pre_if.io.base_pc_from_rj := id_stage.io.base_pc_from_rj
   pre_if.io.offs_ext := id_stage.io.pc_offs
@@ -822,18 +826,19 @@ class minicpu_top_pipline extends Module {
   block_judge.io.exe_rf_waddr:=exe_stage.io.wb_addr_out
   block_judge.io.exe_alu_res:=exe_stage.io.alu_res
   block_judge.io.exe_wb_csr:=exe_stage.io.wb_csr_out
-  block_judge.io.exe_rtime:=exe_stage.io.cntcontrol_out(0)
+  block_judge.io.exe_wb_timedata:=exe_stage.io.cntcontrol_out(0)
 
   block_judge.io.mem_rf_we   :=mem_stage.io.rf_we_out
   block_judge.io.mem_rf_waddr:=mem_stage.io.wb_addr_out
   block_judge.io.mem_wb_data:=mem_stage.io.wb_data
   block_judge.io.mem_wb_csr:=mem_stage.io.wb_csr_out
-  block_judge.io.mem_rtime:=mem_stage.io.cntcontrol_out(0)
+  block_judge.io.mem_wb_timedata:=mem_stage.io.cntcontrol_out(0)
 
   block_judge.io.wb_rf_we    :=wb_stage.io.rf_we_out
   block_judge.io.wb_rf_waddr :=wb_stage.io.wb_addr_out
   block_judge.io.wb_wb_data:=wb_stage.io.wb_data_out
   block_judge.io.wb_wb_csr:=wb_stage.io.wb_csr_out
+  block_judge.io.wb_wb_timedata:=wb_stage.io.cntcontrol_out(0)
 
   if_stage.io.needBlock:=(block_judge.io.needBlock|exe_stage.io.need_divmodule)&&(~wb_stage.io.clearpipline)
   id_stage.io.needBlock:=(block_judge.io.needBlock|exe_stage.io.need_divmodule)&&(~wb_stage.io.clearpipline)
