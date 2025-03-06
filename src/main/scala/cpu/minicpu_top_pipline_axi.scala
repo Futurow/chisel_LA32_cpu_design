@@ -339,12 +339,12 @@ class EXE_stage extends Module {
     exception:=io.exception_in
     ertn_flush:=io.ertn_flush_in
     cntcontrol:=io.cntcontrol_in
-  }.elsewhen(valid&&io.next_ready&&(~div_op(2))){//当是除法指令时阻塞
+  }.elsewhen(valid&&io.next_ready&&(~div_op(2))&&(~need_wait_mem)){//当是除法指令时阻塞
     valid := false.B
     has_send_req:=false.B
   }
   io.cpu_data_req :=(~has_send_req)&&(io.mem_we_out||io.wb_from_mem_out)
-  io.need_wait_mem:=(io.mem_we_out||io.wb_from_mem_out)&&io.cpu_data_data_ok
+  io.need_wait_mem:=(io.mem_we_out||io.wb_from_mem_out)&&(~io.cpu_data_data_ok)
   when(io.cpu_data_req&&io.cpu_data_addr_ok){
     has_send_req:=true.B
   }
@@ -394,7 +394,7 @@ class EXE_stage extends Module {
   val div_res = Mux(div_or_mod,divmod_res(63,32).asSInt,divmod_res(31,0).asSInt)
   io.alu_res := Mux(need_divmodule,div_res,alu.io.alu_res)
   val div_res_valid = Mux(div_sign_unsign,div_sign.io.m_axis_dout_tvalid,div_unsign.io.m_axis_dout_tvalid)
-  ready:=(need_divmodule&div_res_valid)|(~need_divmodule)
+  ready:=((need_divmodule&div_res_valid)|(~need_divmodule))&&(~need_wait_mem)
   io.need_divmodule:=need_divmodule&(~div_res_valid)
   //CSR
   io.wb_csr_out:=wb_csr
@@ -662,7 +662,7 @@ class WB_stage extends Module {
 }
 class AXI_CPU extends Module {
   val io = IO(new Bundle {
-    
+
     //clock、reset
     val cpu_inst_req    = Output(Bool())//请求
     val cpu_inst_wr     = Output(Bool())//1写请求,0读请求
