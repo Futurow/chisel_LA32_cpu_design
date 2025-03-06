@@ -44,13 +44,21 @@ class IF_stage extends Module {
   io.inst_req:=true.B//notfinish
   val valid = RegInit(false.B)
   val ready= true.B
+  val has_send_req = RegInit(false.B)
   val inst_pc = RegInit(UInt(32.W),0x1bfffffc.U)
   // val inst_pc = RegInit(0x1c000000.U)
   when(~io.needBlock){
       inst_pc:=io.inst_sram_addr 
       valid:=io.pre_valid
+      has_send_req:=false.B
   }
-  io.valid:=valid&&(~io.needBlock)
+  when(io.inst_req&&io.inst_addr_ok){//发送请求握手成功
+    has_send_req:=true.B
+  }
+  io.inst_req := (~has_send_req)
+
+
+  io.valid:=valid&&(~io.needBlock)&&(has_send_req&&io.inst_data_ok)
   val branch_target = Mux(io.needBlock,inst_pc,Mux(io.br_taken,io.nextpc,inst_pc + 4.U))
   io.inst_sram_addr := Mux(io.csr_pc_taken,io.csr_pc,branch_target)
   io.inst := io.inst_sram_rdata
