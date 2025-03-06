@@ -662,6 +662,7 @@ class WB_stage extends Module {
 }
 class AXI_CPU extends Module {
   val io = IO(new Bundle {
+    
     //clock、reset
     val cpu_inst_req    = Output(Bool())//请求
     val cpu_inst_wr     = Output(Bool())//1写请求,0读请求
