@@ -235,6 +235,7 @@ class EXE_stage extends Module {
     val next_ready = Input(Bool())
     val ready = Output(Bool())
     val valid = Output(Bool())
+    val cpu_data_req = Output(Bool())
     val cpu_data_addr_ok= Input(Bool())//请求地址(写数据传输)传输ok
     val cpu_data_data_ok= Input(Bool())//请求读数据(写数据)ok
     val src1 = Input(SInt(32.W))
@@ -243,6 +244,7 @@ class EXE_stage extends Module {
     val alu_op = Input(UInt(13.W))
     val mul_op = Input(UInt(2.W))
     val div_op = Input(UInt(3.W))
+    val need_wait_mem = Output(Bool())
     val need_divmodule = Output(Bool())
     val mem_we_in = Input(Bool())
     val mem_we_out = Output(Bool())
@@ -289,6 +291,7 @@ class EXE_stage extends Module {
   val mul_op = RegInit(UInt(2.W), 0.U)
   val div_op = RegInit(UInt(3.W), 0.U)
 
+  val has_send_req = RegInit(false.B)
   val mem_we = RegInit(false.B)
   val mem_pattern = RegInit(UInt(3.W),0.U)
   val wb_from_mem = RegInit(false.B)
@@ -307,9 +310,11 @@ class EXE_stage extends Module {
   val cntcontrol = RegInit(UInt(3.W), 0.U)
   when(io.clear){
     valid:=false.B
+    has_send_req:=false.B
   }
   .elsewhen(io.pre_valid&&io.ready){
     valid := true.B
+    has_send_req:=false.B
     pc := io.pc_in
     wb_addr := io.wb_addr_in
 
@@ -336,8 +341,13 @@ class EXE_stage extends Module {
     cntcontrol:=io.cntcontrol_in
   }.elsewhen(valid&&io.next_ready&&(~div_op(2))){//当是除法指令时阻塞
     valid := false.B
+    has_send_req:=false.B
   }
-
+  io.cpu_data_req :=(~has_send_req)&&(io.mem_we_out||io.wb_from_mem_out)
+  io.need_wait_mem:=(io.mem_we_out||io.wb_from_mem_out)&&io.cpu_data_data_ok
+  when(io.cpu_data_req&&io.cpu_data_addr_ok){
+    has_send_req:=true.B
+  }
   io.valid := valid&io.ready
   io.pc_out := pc 
   io.wb_addr_out := wb_addr
@@ -776,7 +786,8 @@ class AXI_CPU extends Module {
     data_size:=0b11.U
   }
   //访问内存
-  io.cpu_data_req  := exe_stage.io.wb_from_mem_out|data_sram_we.orR
+  // io.cpu_data_req  := exe_stage.io.wb_from_mem_out|data_sram_we.orR
+  io.cpu_data_req  := exe_stage.io.cpu_data_req
   io.cpu_data_wr   := data_sram_we.orR
   io.cpu_data_size := data_size
   io.cpu_data_wstrb:= data_sram_we
@@ -882,8 +893,8 @@ class AXI_CPU extends Module {
   block_judge.io.wb_wb_csr:=wb_stage.io.wb_csr_out
   block_judge.io.wb_wb_timedata:=wb_stage.io.cntcontrol_out(0)
 
-  if_stage.io.needBlock:=(block_judge.io.needBlock|exe_stage.io.need_divmodule)&&(~wb_stage.io.clearpipline)
-  id_stage.io.needBlock:=(block_judge.io.needBlock|exe_stage.io.need_divmodule)&&(~wb_stage.io.clearpipline)
+  if_stage.io.needBlock:=(block_judge.io.needBlock|exe_stage.io.need_divmodule|exe_stage.io.need_wait_mem)&&(~wb_stage.io.clearpipline)
+  id_stage.io.needBlock:=(block_judge.io.needBlock|exe_stage.io.need_divmodule|exe_stage.io.need_wait_mem)&&(~wb_stage.io.clearpipline)
   id_stage.io.forward_rf_rdata1:=block_judge.io.forward_rf_rdata1
   id_stage.io.forward_rf_rdata2:=block_judge.io.forward_rf_rdata2
 }
