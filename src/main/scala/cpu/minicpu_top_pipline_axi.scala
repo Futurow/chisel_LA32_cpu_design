@@ -42,24 +42,34 @@ class IF_stage extends Module {
     val csr_pc_taken = Input(Bool())
   })
   io.inst_req:=true.B//notfinish
-  val valid = RegInit(false.B)
+  val valid = RegInit(true.B)
   val ready= true.B
   val has_send_req = RegInit(false.B)
-  val inst_pc = RegInit(UInt(32.W),0x1bfffffc.U)
+  val has_csr_req = RegInit(false.B)
+  val inst_pc = RegInit(UInt(32.W),0x1c000000.U)//0x1bfffffc
   // val inst_pc = RegInit(0x1c000000.U)
   when(~io.needBlock){
-      inst_pc:=io.inst_sram_addr 
-      valid:=io.pre_valid
+    when(io.br_taken){
+      inst_pc:=io.inst_sram_addr
+    }.elsewhen(io.csr_pc_taken){
+      inst_pc:=io.csr_pc
       has_send_req:=false.B
+      has_csr_req:=true.B
+    }.elsewhen(has_send_req&&io.inst_data_ok){
+      inst_pc:=io.inst_sram_addr + 4.U
+      valid:=io.pre_valid
+    }
   }
   when(io.inst_req&&io.inst_addr_ok){//发送请求握手成功
     has_send_req:=true.B
   }
-  io.inst_req := (~has_send_req)
-
-
+  when(has_send_req&&io.inst_data_ok){//读数据完成
+    has_send_req:=false.B
+  }
+  
+  io.inst_req := (~has_send_req)&&(~io.needBlock)
   io.valid:=valid&&(~io.needBlock)&&(has_send_req&&io.inst_data_ok)
-  val branch_target = Mux(io.needBlock,inst_pc,Mux(io.br_taken,io.nextpc,inst_pc + 4.U))
+  val branch_target = Mux(io.needBlock,inst_pc,Mux(io.br_taken,io.nextpc,inst_pc))
   io.inst_sram_addr := Mux(io.csr_pc_taken,io.csr_pc,branch_target)
   io.inst := io.inst_sram_rdata
   io.pc:=inst_pc
@@ -347,12 +357,12 @@ class EXE_stage extends Module {
     exception:=io.exception_in
     ertn_flush:=io.ertn_flush_in
     cntcontrol:=io.cntcontrol_in
-  }.elsewhen(valid&&io.next_ready&&(~div_op(2))&&(~need_wait_mem)){//当是除法指令时阻塞
+  }.elsewhen(valid&&io.next_ready&&(~io.need_divmodule)&&(~io.need_wait_mem)){//当是除法指令时阻塞
     valid := false.B
     has_send_req:=false.B
   }
-  io.cpu_data_req :=(~has_send_req)&&(io.mem_we_out||io.wb_from_mem_out)
-  io.need_wait_mem:=(io.mem_we_out||io.wb_from_mem_out)&&(~io.cpu_data_data_ok)
+  io.cpu_data_req :=(~has_send_req)&&(mem_we||io.wb_from_mem_out)&&valid
+  io.need_wait_mem:=(mem_we||io.wb_from_mem_out)&&(~io.cpu_data_data_ok)&&valid
   when(io.cpu_data_req&&io.cpu_data_addr_ok){
     has_send_req:=true.B
   }
@@ -402,7 +412,7 @@ class EXE_stage extends Module {
   val div_res = Mux(div_or_mod,divmod_res(63,32).asSInt,divmod_res(31,0).asSInt)
   io.alu_res := Mux(need_divmodule,div_res,alu.io.alu_res)
   val div_res_valid = Mux(div_sign_unsign,div_sign.io.m_axis_dout_tvalid,div_unsign.io.m_axis_dout_tvalid)
-  ready:=((need_divmodule&div_res_valid)|(~need_divmodule))&&(~need_wait_mem)
+  ready:=((need_divmodule&div_res_valid)|(~need_divmodule))&&(~io.need_wait_mem)
   io.need_divmodule:=need_divmodule&(~div_res_valid)
   //CSR
   io.wb_csr_out:=wb_csr
